@@ -1,0 +1,249 @@
+/**
+ * GET /api/dashboard?state=&branch=
+ * Real data from MySQL — no mock values.
+ *
+ * Sources:
+ *   user                        → active employee count + profile breakdown
+ *   daily_achievment_count_ecms → 7-day story/photo trend
+ *   qc_review                   → today's QC mistakes + 7-day trend
+ *   visit_report                → today's field visits
+ *   gmg_raj + gmg_mpcg          → yesterday's edition delays
+ *   page_schedule_time          → scheduled times for delay calc
+ *   legal_cases                 → active case count
+ *   alerts                      → unread alert count
+ */
+const { query }       = require('./_lib/mysql');
+const { requireRole } = require('./_lib/auth');
+const { setCors, handleOptions } = require('./_lib/cors');
+
+const TABLE = process.env.MYSQL_TABLE_EMPLOYEES || 'user';
+
+// Normalise state names → page_schedule_time short codes
+const STATE_NORM = { rajasthan:'raj','raj':'raj', mp:'mp','madhya pradesh':'mp', cg:'cg', chhattisgarh:'cg', metro:'metro' };
+const normState = s => STATE_NORM[(s||'').toLowerCase().trim()] || (s||'').toLowerCase().trim();
+
+module.exports = async function handler(req, res) {
+  setCors(res);
+  if (handleOptions(req, res)) return;
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { authError, user } = requireRole(req, ['Admin', 'State Head', 'Regional Editor', 'Legal']);
+  if (authError) return res.status(authError.status).json({ error: authError.message });
+
+  try {
+    // ── Resolve effective state/branch ────────────────────────────────────────
+    let state  = req.query.state  || '';
+    let branch = req.query.branch || '';
+    if (user.role === 'State Head'      && user.state)  { state = user.state; branch = ''; }
+    if (user.role === 'Regional Editor') {
+      if (user.state)  state  = user.state;
+      if (user.branch) branch = user.branch;
+    }
+    const filterState  = state  && state  !== 'All' ? state  : '';
+    const filterBranch = branch && branch !== 'All' ? branch : '';
+
+    // ── Date helpers ──────────────────────────────────────────────────────────
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const yday     = new Date(); yday.setDate(yday.getDate() - 1);
+    const ydayStr  = yday.toISOString().slice(0, 10);
+    const trend7   = new Date(); trend7.setDate(trend7.getDate() - 6);
+    const trend7Str= trend7.toISOString().slice(0, 10);
+
+    // ── WHERE helpers ─────────────────────────────────────────────────────────
+    const empWhere    = ["(is_emp_working = 1 OR Status = 'Working' OR Status = 'Active')"];
+    const empParams   = [];
+    const legalWhere  = ["status = 'Active'"];
+    const legalParams = [];
+    const ecmsWhere   = [];  const ecmsParams  = [];
+    const visitWhere  = [];  const visitParams = [];
+    const qcWhere     = [];  const qcParams    = [];
+
+    if (filterState) {
+      empWhere.push('State = ?');     empParams.push(filterState);
+      legalWhere.push('state = ?');   legalParams.push(filterState);
+      qcWhere.push('state = ?');      qcParams.push(filterState);
+      ecmsWhere.push('Pan_no IN (SELECT pan_no FROM `user` WHERE State = ?)');  ecmsParams.push(filterState);
+      visitWhere.push('pan_no IN (SELECT pan_no FROM `user` WHERE State = ?)'); visitParams.push(filterState);
+    }
+    if (filterBranch) {
+      empWhere.push('Branch = ?');    empParams.push(filterBranch);
+      legalWhere.push('branch = ?');  legalParams.push(filterBranch);
+      ecmsWhere.push('Pan_no IN (SELECT pan_no FROM `user` WHERE Branch = ?)');  ecmsParams.push(filterBranch);
+      visitWhere.push('pan_no IN (SELECT pan_no FROM `user` WHERE Branch = ?)'); visitParams.push(filterBranch);
+    }
+
+    const ecmsExtra  = ecmsWhere.length  ? ' AND ' + ecmsWhere.join(' AND ')  : '';
+    const visitExtra = visitWhere.length ? ' AND ' + visitWhere.join(' AND ') : '';
+    const qcExtra    = qcWhere.length    ? ' AND ' + qcWhere.join(' AND ')    : '';
+
+    // ── Run all queries in parallel ───────────────────────────────────────────
+    const [
+      empRows, empProfiles,
+      storiesYday, storyTrend,
+      qcToday, qcTrend,
+      visitsToday,
+      legalRows, alertRows,
+      schedRows, rajRows, mpcgRows,
+    ] = await Promise.all([
+
+      // 1. Active employee count
+      query(`SELECT COUNT(*) AS cnt FROM \`${TABLE}\` WHERE ${empWhere.join(' AND ')}`, empParams)
+        .catch(() => [{ cnt: 0 }]),
+
+      // 2. Profile breakdown (Story_Type) for active employees
+      query(`SELECT TRIM(Story_Type) AS profile, COUNT(*) AS cnt
+             FROM \`${TABLE}\` WHERE ${empWhere.join(' AND ')} AND Story_Type IS NOT NULL AND Story_Type != ''
+             GROUP BY TRIM(Story_Type) ORDER BY cnt DESC`, empParams)
+        .catch(() => []),
+
+      // 3. Stories published yesterday
+      query(`SELECT SUM(No_Story) AS stories, SUM(No_Photo) AS photos, SUM(No_Words) AS words,
+                    COUNT(DISTINCT Pan_no) AS reporters
+             FROM daily_achievment_count_ecms
+             WHERE DATE(entrydate) = ?${ecmsExtra}`,
+             [ydayStr, ...ecmsParams]).catch(() => [{}]),
+
+      // 4. 7-day story trend
+      query(`SELECT DATE(entrydate) AS d, SUM(No_Story) AS stories,
+                    SUM(No_Photo) AS photos, SUM(Exclusive) AS exclusive
+             FROM daily_achievment_count_ecms
+             WHERE DATE(entrydate) BETWEEN ? AND ?${ecmsExtra}
+             GROUP BY DATE(entrydate) ORDER BY d ASC`,
+             [trend7Str, ydayStr, ...ecmsParams]).catch(() => []),
+
+      // 5. QC mistakes yesterday
+      query(`SELECT COUNT(*) AS checks, SUM(no_of_mistake) AS mistakes
+             FROM qc_review WHERE DATE(entrydate) = ?${qcExtra}`,
+             [ydayStr, ...qcParams]).catch(() => [{}]),
+
+      // 6. QC 7-day trend
+      query(`SELECT DATE(entrydate) AS d, SUM(no_of_mistake) AS mistakes
+             FROM qc_review WHERE DATE(entrydate) BETWEEN ? AND ?${qcExtra}
+             GROUP BY DATE(entrydate) ORDER BY d ASC`,
+             [trend7Str, ydayStr, ...qcParams]).catch(() => []),
+
+      // 7. Field visits today
+      query(`SELECT COUNT(*) AS cnt FROM visit_report WHERE DATE(visit_date) = ?${visitExtra}`,
+             [todayStr, ...visitParams]).catch(() => [{ cnt: 0 }]),
+
+      // 8. Active legal cases
+      query(`SELECT COUNT(*) AS cnt FROM legal_cases WHERE ${legalWhere.join(' AND ')}`, legalParams)
+        .catch(() => [{ cnt: 0 }]),
+
+      // 9. Unread alerts
+      query('SELECT COUNT(*) AS cnt FROM alerts WHERE is_read = 0')
+        .catch(() => [{ cnt: 0 }]),
+
+      // 10. Schedule times
+      query('SELECT UPPER(file_name) AS code, unit, state, edition_name, schedule_time FROM page_schedule_time')
+        .catch(() => []),
+
+      // 11. Yesterday's GMG releases — Rajasthan
+      query(`SELECT UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file,'-',2),'-',-1)) AS code,
+                    MAX(date_time_pdf) AS release_time
+             FROM gmg_raj
+             WHERE input_file REGEXP '^[0-9]{8}-' AND date_time_pdf IS NOT NULL
+               AND STR_TO_DATE(LEFT(input_file,8),'%d%m%Y') = ?
+             GROUP BY code`, [ydayStr]).catch(() => []),
+
+      // 12. Yesterday's GMG releases — MP/CG
+      query(`SELECT UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file,'-',2),'-',-1)) AS code,
+                    MAX(date_time_pdf) AS release_time
+             FROM gmg_mpcg
+             WHERE input_file REGEXP '^[0-9]{8}-' AND date_time_pdf IS NOT NULL
+               AND STR_TO_DATE(LEFT(input_file,8),'%d%m%Y') = ?
+             GROUP BY code`, [ydayStr]).catch(() => []),
+    ]);
+
+    // ── Compute edition delays ────────────────────────────────────────────────
+    const schedMap = {};
+    schedRows.forEach(s => { schedMap[s.code] = s; });
+
+    const pubDate = new Date(ydayStr);
+    const allReleases = [...rajRows, ...mpcgRows];
+
+    const editionDelays = allReleases
+      .map(r => {
+        const sched = schedMap[r.code];
+        if (!sched) return null;
+        // Filter by state/branch if applicable
+        if (filterState && normState(sched.state) !== normState(filterState)) return null;
+        if (filterBranch && (sched.unit || '').toLowerCase() !== filterBranch.toLowerCase()) return null;
+
+        const [sh, sm] = (sched.schedule_time || '00:00:00').split(':').map(Number);
+        const schedDate = new Date(pubDate);
+        if (sh >= 12) schedDate.setDate(schedDate.getDate() - 1);
+        schedDate.setHours(sh, sm, 0, 0);
+        const delay_minutes = Math.round((new Date(r.release_time) - schedDate) / 60000);
+        return {
+          edition: sched.edition_name || sched.unit || r.code,
+          unit:    sched.unit || '',
+          delay:   delay_minutes,
+          status:  delay_minutes <= 0 ? 'ontime' : delay_minutes <= 30 ? 'warn' : 'late',
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.delay - a.delay)
+      .slice(0, 15); // top 15 for chart
+
+    // ── Format 7-day trend (fill missing days) ────────────────────────────────
+    const storyTrendMap = {};
+    storyTrend.forEach(r => {
+      const d = r.d ? String(r.d).slice(0, 10) : '';
+      if (d) storyTrendMap[d] = r;
+    });
+    const qcTrendMap = {};
+    qcTrend.forEach(r => {
+      const d = r.d ? String(r.d).slice(0, 10) : '';
+      if (d) qcTrendMap[d] = r;
+    });
+
+    const trend7days = [];
+    for (let i = 6; i >= 0; i--) {
+      const dt = new Date(); dt.setDate(dt.getDate() - 1 - i);
+      const ds = dt.toISOString().slice(0, 10);
+      const label = dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+      trend7days.push({
+        date:    ds,
+        label,
+        stories:  Number(storyTrendMap[ds]?.stories  || 0),
+        photos:   Number(storyTrendMap[ds]?.photos   || 0),
+        exclusive:Number(storyTrendMap[ds]?.exclusive|| 0),
+        mistakes: Number(qcTrendMap[ds]?.mistakes    || 0),
+      });
+    }
+
+    // ── Profile pie ───────────────────────────────────────────────────────────
+    const profilePie = empProfiles.map(r => ({
+      name:  (r.profile || 'Unknown').trim(),
+      value: Number(r.cnt),
+    }));
+
+    // ── Summarise delays ──────────────────────────────────────────────────────
+    const delayedCount = editionDelays.filter(e => e.status !== 'ontime').length;
+    const onTimeCount  = editionDelays.filter(e => e.status === 'ontime').length;
+
+    return res.json({
+      kpis: {
+        employees:    Number(empRows[0]?.cnt    || 0),
+        stories:      Number(storiesYday[0]?.stories || 0),
+        reporters:    Number(storiesYday[0]?.reporters || 0),
+        photos:       Number(storiesYday[0]?.photos  || 0),
+        visits:       Number(visitsToday[0]?.cnt || 0),
+        qcMistakes:   Number(qcToday[0]?.mistakes || 0),
+        legal:        Number(legalRows[0]?.cnt || 0),
+        alerts:       Number(alertRows[0]?.cnt || 0),
+        editions:     editionDelays.length,
+        delayed:      delayedCount,
+        onTime:       onTimeCount,
+      },
+      trend7days,
+      profilePie,
+      editionDelays,
+    });
+
+  } catch (err) {
+    console.error('[dashboard]', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};

@@ -1,0 +1,16 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+python-multipart==0.0.12
+python-dotenv==1.0.1
+
+# --- Uncomment for production AI features ---
+# openai==1.51.0          # GPT content quality, summaries, tags, chatbot
+# openai-whisper==20240930 # speech-to-text (or use OpenAI audio API)
+# pytesseract==0.3.13     # OCR (also requires system 'tesseract-ocr' + hindi lang pack)
+# Pillow==10.4.0          # image handling for OCR
+# pdf2image==1.17.0       # rasterize PDF pages for OCR
+# langchain==0.3.3        # SQL agent / chatbot orchestration
+# langchain-openai==0.2.2
+# SQLAlchemy==2.0.35      # let the SQL agent query MySQL
+# PyMySQL==1.1.1

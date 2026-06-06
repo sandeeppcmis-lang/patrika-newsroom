@@ -1,0 +1,6 @@
+DirectoryIndex index.php index.html
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^$ /patrika-newsroom/frontend/dist/ [R=301,L]
+    RewriteRule ^index\.html$ /patrika-newsroom/frontend/dist/ [R=301,L]
+</IfModule>
