@@ -14,7 +14,7 @@ export default {
         }
       },
       fontFamily: {
-        display: ['"Roboto"', 'Georgia', 'serif'],
+        display: ['"Roboto"', 'sans-serif'],
         sans: ['"Roboto"', '"Noto Sans Devanagari"', 'system-ui', 'sans-serif']
       },
       boxShadow: {

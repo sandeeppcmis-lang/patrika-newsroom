@@ -44,7 +44,7 @@ function Tile({ icon: Icon, label, value, sub, color = '#3b82f6' }) {
         <Icon size={18} />
       </span>
       <div>
-        <div className="text-2xl font-bold" style={{ fontFamily: 'Georgia,serif' }}>{value ?? '—'}</div>
+        <div className="text-2xl font-bold" style={{ fontFamily: 'Roboto, sans-serif' }}>{value ?? '—'}</div>
         <div className="text-xs font-medium">{label}</div>
         {sub && <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{sub}</div>}
       </div>

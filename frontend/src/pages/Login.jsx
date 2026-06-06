@@ -32,7 +32,7 @@ export default function Login() {
         <div className="brand-bar absolute inset-x-0 top-0 h-2" />
         <Logo size={48} withText={false} />
         <div>
-          <h1 className="text-4xl font-bold leading-tight" style={{ fontFamily: 'Georgia, serif' }}>{t('appName')}</h1>
+          <h1 className="text-4xl font-bold leading-tight" style={{ fontFamily: 'Roboto, sans-serif' }}>{t('appName')}</h1>
           <p className="mt-3 max-w-md text-white/80">{t('tagline')}</p>
           <ul className="mt-6 space-y-2 text-sm text-white/80">
             <li>• State & branch-wise HR dashboard · RE, Reporter, Desk, Photographer profiles</li>

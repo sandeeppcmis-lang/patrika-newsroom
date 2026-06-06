@@ -219,7 +219,7 @@ function Tile({ icon: Icon, label, value, accent = '#3b82f6' }) {
       <span className="rounded-lg p-1.5 inline-flex" style={{ background: accent + '1a', color: accent }}>
         <Icon size={16} />
       </span>
-      <div className="mt-2 text-3xl font-bold" style={{ fontFamily: 'Georgia, serif' }}>{value}</div>
+      <div className="mt-2 text-3xl font-bold" style={{ fontFamily: 'Roboto, sans-serif' }}>{value}</div>
       <div className="text-xs" style={{ color: 'var(--muted)' }}>{label}</div>
     </div>
   );

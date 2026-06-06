@@ -1616,7 +1616,7 @@ function AdminTab({ emps, canEditHr }) {
 function RetTile({ label, count, color }) {
   return (
     <div className="card p-4">
-      <div className="text-3xl font-bold" style={{ fontFamily: 'Georgia, serif', color }}>{count}</div>
+      <div className="text-3xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', color }}>{count}</div>
       <div className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{label}</div>
     </div>
   );
@@ -1631,7 +1631,7 @@ function Tile({ icon: Icon, label, value, color }) {
       <span className="inline-flex rounded-lg p-1.5" style={{ background: color + '1a', color }}>
         <Icon size={16} />
       </span>
-      <div className="mt-2 text-3xl font-bold" style={{ fontFamily: 'Georgia, serif' }}>{value}</div>
+      <div className="mt-2 text-3xl font-bold" style={{ fontFamily: 'Roboto, sans-serif' }}>{value}</div>
       <div className="text-xs" style={{ color: 'var(--muted)' }}>{label}</div>
     </div>
   );

@@ -20,7 +20,7 @@ export function KPICard({ label, value, sub, accent = '#d71920', icon: Icon }) {
         <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</span>
         {Icon && <span className="rounded-lg p-1.5" style={{ background: accent + '1a', color: accent }}><Icon size={16} /></span>}
       </div>
-      <div className="mt-2 text-3xl font-bold" style={{ fontFamily: 'Georgia, serif' }}>{value}</div>
+      <div className="mt-2 text-3xl font-bold" style={{ fontFamily: 'Roboto, sans-serif' }}>{value}</div>
       {sub && <div className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>{sub}</div>}
     </div>
   );
@@ -50,7 +50,7 @@ export function PageHeader({ title, subtitle, children }) {
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold" style={{ fontFamily: 'Georgia, serif' }}>{title}</h1>
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'Roboto, sans-serif' }}>{title}</h1>
         {subtitle && <p className="text-sm" style={{ color: 'var(--muted)' }}>{subtitle}</p>}
       </div>
       {children}

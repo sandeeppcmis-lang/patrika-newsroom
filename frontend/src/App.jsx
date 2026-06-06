@@ -22,7 +22,7 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 32, fontFamily: 'monospace' }}>
+        <div style={{ padding: 32, fontFamily: 'Roboto, sans-serif' }}>
           <h2 style={{ color: '#d71920' }}>⚠ App Error</h2>
           <p style={{ marginTop: 8 }}><strong>Message:</strong> {this.state.error.message}</p>
           <pre style={{ marginTop: 12, background: '#f5f5f5', padding: 16, borderRadius: 8, fontSize: 12, overflow: 'auto' }}>
