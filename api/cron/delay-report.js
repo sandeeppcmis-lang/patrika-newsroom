@@ -117,7 +117,8 @@ async function getRecipients(branch) {
        AND telegram_chat_id IS NOT NULL AND telegram_chat_id != ''
        AND (is_emp_working = 1 OR Status IN ('Working','Active'))
        AND (
-         Story_Type REGEXP '[[:<:]]RE[[:>:]]'
+         Story_Type IN ('RE','Desk Head','Desk','Nics Desk','Feature Desk','Desk Metro Ho',
+                        'R&D Desk','Documentation Desk','Desk Metro Edition','Edit Page Desk','Publication Desk')
          OR LOWER(Story_Type)      LIKE '%desk%'
          OR LOWER(emp_designation) LIKE '%desk head%'
          OR LOWER(emp_designation) LIKE '%regional editor%'

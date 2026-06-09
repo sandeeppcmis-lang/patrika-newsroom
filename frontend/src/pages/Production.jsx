@@ -83,6 +83,7 @@ function DelayTooltip({ active, payload }) {
 function TelegramConfigModal({ onClose }) {
   const [recipients, setRecipients] = useState([]);
   const [loading,    setLoading]    = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [saving,     setSaving]     = useState(null);
   const [edits,      setEdits]      = useState({});
   const [search,     setSearch]     = useState('');
@@ -91,13 +92,17 @@ function TelegramConfigModal({ onClose }) {
     fetch('/api/production/delay-report', {
       headers: { Authorization: `Bearer ${localStorage.getItem('pk_token')}` },
     })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) return r.json().then(e => { throw new Error(e.error || `HTTP ${r.status}`); });
+        return r.json();
+      })
       .then(d => {
         setRecipients(d.recipients || []);
         const init = {};
         (d.recipients || []).forEach(r => { init[r.pan_no] = r.telegram_chat_id || ''; });
         setEdits(init);
       })
+      .catch(e => setFetchError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
@@ -157,6 +162,13 @@ function TelegramConfigModal({ onClose }) {
         {loading ? (
           <div className="flex justify-center py-10">
             <Loader2 size={20} className="animate-spin" style={{ color: 'var(--muted)' }} />
+          </div>
+        ) : fetchError ? (
+          <div className="rounded-lg p-4 text-sm" style={{ background: '#d7192015', color: '#d71920' }}>
+            ⚠️ Could not load recipients: <strong>{fetchError}</strong>
+            <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+              Only Admin and State Head roles can access this configuration.
+            </p>
           </div>
         ) : recipients.length === 0 ? (
           <p className="text-sm py-6 text-center" style={{ color: 'var(--muted)' }}>
