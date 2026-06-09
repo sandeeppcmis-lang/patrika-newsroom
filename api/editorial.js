@@ -82,7 +82,7 @@ const RECURRING = [
 
   // ── Hyperlocal: MP + CG (both states) ────────────────────────────────────
   { md:'11-15', label:'Janjatiya Gaurav Diwas', type:'local_mpcg', region:'MPCG', color:'#C9A227', angle:'Birsa Munda birth anniversary — tribal welfare schemes, Van Adhikar Patta, PESA act implementation, forest rights, displaced tribal families, literacy data in MP/CG tribal belt' },
-  { md:'10-02', label:'Gandhi Jayanti / Tribal Link (MP-CG)', type:'local_mpcg', region:'MPCG', color:'#d71920', angle:'Gram Swaraj in tribal MP/CG — Mahatma's vision vs ground reality; MNREGA in Adivasi districts, village self-governance under PESA, forest produce economy' },
+  { md:'10-02', label:'Gandhi Jayanti / Tribal Link (MP-CG)', type:'local_mpcg', region:'MPCG', color:'#d71920', angle:'Gram Swaraj in tribal MP/CG -- Mahatma\'s vision vs ground reality; MNREGA in Adivasi districts, village self-governance under PESA, forest produce economy' },
 ];
 
 // Fixed dates in 2026 Gregorian calendar
