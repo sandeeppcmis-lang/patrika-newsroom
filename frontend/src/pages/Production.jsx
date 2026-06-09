@@ -778,7 +778,8 @@ function PageJourneyTab({ date, setDate, shiftDate }) {
                 </span>
                 <span className="text-xs opacity-70 block">
                   {ed.unit && ed.unit !== ed.edition_name ? `${ed.unit} · ` : ''}
-                  {ed.total_pages}p · {ed.revised_pages > 0 ? `${ed.revised_pages} rev` : '✓'}
+                  {ed.total_pages}{ed.scheduled_pages > 0 ? `/${ed.scheduled_pages}` : ''} pages
+                  {' · '}{ed.revised_pages > 0 ? `${ed.revised_pages} rev` : '✓'}
                 </span>
               </button>
             ))}
@@ -788,12 +789,36 @@ function PageJourneyTab({ date, setDate, shiftDate }) {
             <>
               {/* Summary tiles */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 mb-4">
+
+                {/* Pages uploaded vs scheduled — special tile */}
+                <div className="card p-4">
+                  <div className="flex items-end gap-1">
+                    <span className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{activeEdn.total_pages}</span>
+                    {activeEdn.scheduled_pages > 0 && (
+                      <span className="text-sm font-semibold mb-0.5" style={{ color: 'var(--muted)' }}>
+                        / {activeEdn.scheduled_pages}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+                    Pages{activeEdn.scheduled_pages > 0 ? ' Uploaded / Total' : ' Uploaded'}
+                  </div>
+                  {activeEdn.scheduled_pages > 0 && (
+                    <div className="mt-2 w-full rounded-full h-1.5" style={{ background: 'var(--border)' }}>
+                      <div className="h-1.5 rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(100, Math.round((activeEdn.total_pages / activeEdn.scheduled_pages) * 100))}%`,
+                          background: activeEdn.total_pages >= activeEdn.scheduled_pages ? '#10b981' : '#C9A227',
+                        }} />
+                    </div>
+                  )}
+                </div>
+
                 {[
-                  { label: 'Total Pages',    value: activeEdn.total_pages,    color: '#3b82f6' },
-                  { label: 'Pages Revised',  value: activeEdn.revised_pages,  color: activeEdn.revised_pages > 0 ? '#d71920' : '#10b981' },
-                  { label: 'First Upload',   value: fmtT(activeEdn.edition_first), color: '#10b981' },
-                  { label: 'Last Upload',    value: fmtT(activeEdn.edition_last),  color: '#C9A227' },
-                  { label: 'Total Duration', value: fmtDur(activeEdn.edition_duration), color: '#8b5cf6' },
+                  { label: 'Pages Revised',  value: activeEdn.revised_pages,              color: activeEdn.revised_pages > 0 ? '#d71920' : '#10b981' },
+                  { label: 'First Upload',   value: fmtT(activeEdn.edition_first),        color: '#10b981' },
+                  { label: 'Last Upload',    value: fmtT(activeEdn.edition_last),         color: '#C9A227' },
+                  { label: 'Total Duration', value: fmtDur(activeEdn.edition_duration),   color: '#8b5cf6' },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="card p-4">
                     <div className="text-2xl font-bold" style={{ color }}>{value || '—'}</div>

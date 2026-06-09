@@ -84,9 +84,11 @@ module.exports = async function handler(req, res) {
     const [rajRows, mpcgRows, schedRows] = await Promise.all([
       query(JOURNEY_SQL.replace('{TABLE}', 'gmg_raj'),  [date]).catch(() => []),
       query(JOURNEY_SQL.replace('{TABLE}', 'gmg_mpcg'), [date]).catch(() => []),
-      // Fetch edition name lookup from schedule table (same as production monitor)
-      query(`SELECT UPPER(file_name) AS code, edition_name, unit, district, state, edition_type
-             FROM page_schedule_time`).catch(() => []),
+      // Fetch edition name + scheduled page count from schedule table
+      query(`SELECT UPPER(file_name) AS code, edition_name, unit, district, state, edition_type,
+                    COUNT(*) AS scheduled_pages
+             FROM page_schedule_time
+             GROUP BY UPPER(file_name), edition_name, unit, district, state, edition_type`).catch(() => []),
     ]);
 
     // Build lookup: UPPER(code) → schedule info
@@ -115,14 +117,15 @@ module.exports = async function handler(req, res) {
 
       if (!editionMap[key]) {
         editionMap[key] = {
-          code:         edition_code,
-          edition_name: sched.edition_name || edition_code,   // proper name
-          unit:         sched.unit         || '',
-          district:     sched.district     || '',
-          state:        sched.state        || '',
-          edition_type: sched.edition_type || '',
-          region:       row.region,
-          pageMap:      {},
+          code:            edition_code,
+          edition_name:    sched.edition_name  || edition_code,
+          unit:            sched.unit          || '',
+          district:        sched.district      || '',
+          state:           sched.state         || '',
+          edition_type:    sched.edition_type  || '',
+          scheduled_pages: Number(sched.scheduled_pages || 0),
+          region:          row.region,
+          pageMap:         {},
         };
       }
 
@@ -186,13 +189,14 @@ module.exports = async function handler(req, res) {
         : 0;
 
       return {
-        code:         ed.code,
-        edition_name: ed.edition_name,
-        unit:         ed.unit,
-        district:     ed.district,
-        state:        ed.state,
-        edition_type: ed.edition_type,
-        region:       ed.region,
+        code:            ed.code,
+        edition_name:    ed.edition_name,
+        unit:            ed.unit,
+        district:        ed.district,
+        state:           ed.state,
+        edition_type:    ed.edition_type,
+        region:          ed.region,
+        scheduled_pages: ed.scheduled_pages,
         pages,
         edition_first,
         edition_last,
