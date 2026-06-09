@@ -16,16 +16,8 @@ const { setCors, handleOptions } = require('../_lib/cors');
 const { query }          = require('../_lib/mysql');
 const { runDelayReport } = require('../cron/delay-report');
 
-// Story_Type values that qualify as Desk Head or RE
-// Note: MySQL 8 uses \\b for word boundary, NOT [[:<:]] (MySQL 5.x syntax)
-const ROLE_FILTER = `(
-  Story_Type IN ('RE', 'Desk Head', 'Desk', 'Nics Desk', 'Feature Desk', 'Desk Metro Ho', 'R&D Desk',
-                 'Documentation Desk', 'Desk Metro Edition', 'Edit Page Desk', 'Publication Desk')
-  OR LOWER(Story_Type)      LIKE '%desk%'
-  OR LOWER(emp_designation) LIKE '%desk head%'
-  OR LOWER(emp_designation) LIKE '%regional editor%'
-  OR LOWER(emp_designation) LIKE '%news editor%'
-)`;
+// Only exact Story_Type matches for 'Desk Head' and 'RE'
+const ROLE_FILTER = `Story_Type IN ('Desk Head', 'RE')`;
 
 module.exports = async function handler(req, res) {
   setCors(res);
