@@ -23,9 +23,13 @@ const app        = express();
 const botPoller  = require('./api/telegram/poller');
 botPoller.start();   // starts only if TELEGRAM_BOT_TOKEN is set
 
-// ── Cron: 8 AM delay report ───────────────────────────────────────────────────
+// ── Cron: 8 AM daily delay report ────────────────────────────────────────────
 const delayReport = require('./api/cron/delay-report');
 delayReport.register();
+
+// ── Cron: Monday 9 AM weekly appreciation ────────────────────────────────────
+const weeklyAppreciation = require('./api/cron/weekly-appreciation');
+weeklyAppreciation.register();
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
@@ -58,9 +62,12 @@ app.all('/api/dashboard',             h('./api/dashboard'));
 // ── Editorial / Production / Pages / Reports ──────────────────────────────────
 app.all('/api/editorial/feeds',       h('./api/editorial/feeds'));   // must be before /api/editorial
 app.all('/api/editorial',             h('./api/editorial'));
-app.all('/api/production/delay-report', h('./api/production/delay-report'));
-app.all('/api/production/page-journey', h('./api/production/page-journey'));
-app.all('/api/production',              h('./api/production'));
+app.all('/api/production/delay-report',        h('./api/production/delay-report'));
+app.all('/api/production/weekly-appreciation', h('./api/production/weekly-appreciation'));
+app.all('/api/production/delay-reasons', h('./api/production/delay-reasons'));
+app.all('/api/production/page-journey',  h('./api/production/page-journey'));
+app.all('/api/production/weekly-trend',  h('./api/production/weekly-trend'));
+app.all('/api/production',               h('./api/production'));
 app.all('/api/pages',                 h('./api/pages'));
 app.all('/api/reports',               h('./api/reports'));
 
