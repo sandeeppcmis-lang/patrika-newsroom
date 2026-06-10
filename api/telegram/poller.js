@@ -142,8 +142,71 @@ async function processMessage(token, msg) {
     return;
   }
 
-  // ── PAN number input ─────────────────────────────────────────────────────────
-  // Accept if: user is awaiting PAN, OR text looks like a PAN (alphanumeric, 5–25 chars)
+  // ── REASON command — capture delay reason (MUST be before PAN check) ─────────
+  // Format: REASON <text>   (case-insensitive)
+  const reasonMatch = text.match(/^REASON\s+(.+)$/i);
+  if (reasonMatch) {
+    const reasonText = reasonMatch[1].trim();
+    if (!reasonText) {
+      await sendMsg(token, chatId,
+        `❌ Please include your reason.\nExample: <code>REASON Power outage at press</code>`
+      );
+      return;
+    }
+
+    // Look up the sender by chat_id
+    const userRows = await query(
+      `SELECT EMPNAME, Branch, State FROM \`user\`
+       WHERE telegram_chat_id = ? LIMIT 1`,
+      [String(chatId)]
+    ).catch(() => []);
+
+    if (!userRows.length) {
+      await sendMsg(token, chatId,
+        `❌ You are not registered yet.\nSend /start to register first.`
+      );
+      return;
+    }
+
+    const u = userRows[0];
+
+    // Default to yesterday (the date the delay report covers)
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const pubDate = d.toISOString().slice(0, 10);
+
+    try {
+      await query(
+        `INSERT INTO delay_reasons
+           (branch, state, pub_date, reason, submitted_by_name, submitted_by_chat_id)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [u.Branch || '', u.State || '', pubDate, reasonText, u.EMPNAME || '', String(chatId)]
+      );
+    } catch (err) {
+      console.error('[bot] ❌ delay_reasons insert failed:', err.message);
+      await sendMsg(token, chatId,
+        `❌ <b>Could not save reason.</b>\n\nDB error: <code>${err.message}</code>\n\nPlease contact admin.`
+      );
+      return;
+    }
+
+    const dateStr = new Date(pubDate + 'T00:00:00').toLocaleDateString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    });
+
+    await sendMsg(token, chatId,
+      `✅ <b>Delay reason recorded!</b>\n\n` +
+      `📍 Branch: <b>${u.Branch}</b> · ${u.State}\n` +
+      `📅 Date: ${dateStr}\n` +
+      `💬 Reason: <i>${reasonText}</i>\n\n` +
+      `<i>Thank you. Your reason has been saved in the system.</i>`
+    );
+    console.log(`[bot] ✅ Delay reason from ${u.EMPNAME} (${u.Branch}) for ${pubDate}: "${reasonText}"`);
+    return;
+  }
+
+  // ── PAN number input ──────────────────────────────────────────────────────────
+  // Accept if: user is awaiting PAN, OR text looks like a PAN (alphanumeric, 5–25 chars, no spaces)
   const looksPan = /^[A-Z0-9]{5,25}$/i.test(text);
   if (awaitingPan.has(chatId) || looksPan) {
     const pan = text.toUpperCase().trim();
@@ -201,10 +264,23 @@ async function processMessage(token, msg) {
   }
 
   // ── Default ──────────────────────────────────────────────────────────────────
-  awaitingPan.add(chatId);
-  await sendMsg(token, chatId,
-    `Send your <b>PAN Number</b> to register.\nExample: <code>RPJXX12345</code>\n\nOr send /help for more options.`
-  );
+  // Check if this person is registered — if so, give a helpful hint about REASON command
+  const regCheck = await query(
+    `SELECT Branch FROM \`user\` WHERE telegram_chat_id = ? LIMIT 1`,
+    [String(chatId)]
+  ).catch(() => []);
+
+  if (regCheck.length) {
+    await sendMsg(token, chatId,
+      `ℹ️ To submit a delay reason, reply:\n<code>REASON your reason here</code>\n\n` +
+      `Other commands:\n/status — check registration\n/stop — unregister\n/help — help`
+    );
+  } else {
+    awaitingPan.add(chatId);
+    await sendMsg(token, chatId,
+      `Send your <b>PAN Number</b> to register.\nExample: <code>RPJXX12345</code>\n\nOr send /help for more options.`
+    );
+  }
 }
 
 // ── Long polling loop ─────────────────────────────────────────────────────────

@@ -18,6 +18,10 @@ const { query }       = require('../_lib/mysql');
 const { requireRole } = require('../_lib/auth');
 const { setCors, handleOptions } = require('../_lib/cors');
 
+// ── Editions permanently excluded from all production views ───────────────────
+const HIDDEN_EDITIONS = ['nt jaipur city', 'nt jaipur dak'];
+const isHidden = name => HIDDEN_EDITIONS.includes((name || '').toLowerCase().trim());
+
 // ── Filename parser ───────────────────────────────────────────────────────────
 // Format: DDMMYYYY-EDITIONCODE-PAGEINFO.pdf
 // PAGEINFO examples: 01, 06_Bold, 03_north, 03_north_REV_1, 18_001, 13-Patrika Bold
@@ -114,6 +118,8 @@ module.exports = async function handler(req, res) {
 
       // Look up proper name from page_schedule_time
       const sched = schedMap[edition_code.toUpperCase()] || {};
+
+      if (isHidden(sched.edition_name)) return;
 
       if (!editionMap[key]) {
         editionMap[key] = {
