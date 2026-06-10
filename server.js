@@ -53,6 +53,7 @@ app.all('/api/auth/whoami',           h('./api/auth/whoami'));
 app.all('/api/auth/setup',            h('./api/auth/setup'));   // delete after first login
 
 // ── Users (Admin only) ────────────────────────────────────────────────────────
+app.all('/api/users/sync',            h('./api/users/sync'));   // must be before /:id
 app.all('/api/users/:id',             h('./api/users/[id]'));
 app.all('/api/users',                 h('./api/users'));
 

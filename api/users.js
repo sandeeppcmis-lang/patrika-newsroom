@@ -10,6 +10,19 @@ const { setCors, handleOptions } = require('./_lib/cors');
 
 const VALID_ROLES = ['Admin', 'State Head', 'Regional Editor', 'Legal'];
 
+// Ensure is_active column exists (runs once; safe to call repeatedly)
+async function ensureIsActiveColumn() {
+  try {
+    await query(`ALTER TABLE users ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1`);
+    console.log('[users] Added is_active column to users table');
+  } catch (e) {
+    if (!e.message.includes('Duplicate column') && !e.message.includes('1060')) {
+      console.warn('[users] Could not add is_active column:', e.message);
+    }
+  }
+}
+ensureIsActiveColumn();
+
 module.exports = async (req, res) => {
   setCors(res);
   if (handleOptions(req, res)) return;
@@ -21,7 +34,7 @@ module.exports = async (req, res) => {
   if (req.method === 'GET') {
     try {
       const rows = await query(
-        'SELECT id, username, name, role, state, branch, created_at FROM users ORDER BY name ASC'
+        'SELECT id, username, name, role, state, branch, COALESCE(is_active, 1) AS is_active, created_at FROM users ORDER BY name ASC'
       );
       return res.json(rows);
     } catch (err) {
@@ -32,7 +45,7 @@ module.exports = async (req, res) => {
   // ── POST — create user ────────────────────────────────────────────────────
   if (req.method === 'POST') {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-    const { username, name, password, role, state, branch } = body;
+    const { username, name, password, role, state, branch, is_active } = body;
 
     if (!username || !name || !password || !role)
       return res.status(422).json({ error: 'username, name, password and role are required' });
@@ -42,12 +55,13 @@ module.exports = async (req, res) => {
 
     try {
       const password_hash = await bcrypt.hash(password, 10);
+      const activeVal = (is_active === false || is_active === 0) ? 0 : 1;
       const result = await query(
-        'INSERT INTO users (username, name, password_hash, role, state, branch) VALUES (?, ?, ?, ?, ?, ?)',
-        [username, name, password_hash, role, state || null, branch || null]
+        'INSERT INTO users (username, name, password_hash, role, state, branch, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [username, name, password_hash, role, state || null, branch || null, activeVal]
       );
       const [created] = await query(
-        'SELECT id, username, name, role, state, branch, created_at FROM users WHERE id = ?',
+        'SELECT id, username, name, role, state, branch, COALESCE(is_active,1) AS is_active, created_at FROM users WHERE id = ?',
         [result.insertId]
       );
       return res.status(201).json(created);

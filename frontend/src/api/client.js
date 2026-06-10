@@ -46,9 +46,10 @@ export const api = {
 
   // ── User management (Admin only) ─────────────────────────────────────────
   listUsers:   ()         => request('/users'),
-  createUser:  (data)     => request('/users',    { method: 'POST',   body: JSON.stringify(data) }),
-  updateUser:  (id, data) => request(`/users/${id}`, { method: 'PATCH',  body: JSON.stringify(data) }),
-  deleteUser:  (id)       => request(`/users/${id}`, { method: 'DELETE' }),
+  createUser:  (data)     => request('/users',        { method: 'POST',   body: JSON.stringify(data) }),
+  updateUser:  (id, data) => request(`/users/${id}`,  { method: 'PATCH',  body: JSON.stringify(data) }),
+  deleteUser:  (id)       => request(`/users/${id}`,  { method: 'DELETE' }),
+  syncUsers:   ()         => request('/users/sync',   { method: 'POST' }),
   dashboard: (state, branch) => {
     const p = new URLSearchParams();
     if (state  && state  !== 'All') p.set('state',  state);

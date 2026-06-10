@@ -31,6 +31,9 @@ module.exports = async function handler(req, res) {
     const passwordOk = await bcrypt.compare(password, u.password_hash);
     if (!passwordOk) return res.status(401).json({ error: 'Invalid username or password' });
 
+    // Block inactive accounts (is_active = 0); treat missing column (undefined) as active
+    if (u.is_active === 0) return res.status(403).json({ error: 'Your account is inactive. Contact the Admin.' });
+
     const role = ROLE_MAP[u.role] || u.role;
     const payload = {
       sub:    username,
