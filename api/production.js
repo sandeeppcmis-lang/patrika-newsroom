@@ -12,6 +12,10 @@ const { query }       = require('./_lib/mysql');
 const { requireRole } = require('./_lib/auth');
 const { setCors, handleOptions } = require('./_lib/cors');
 
+// ── Editions permanently excluded from all production views ───────────────────
+const HIDDEN_EDITIONS = ['nt jaipur city', 'nt jaipur dak'];
+const isHidden = name => HIDDEN_EDITIONS.includes((name || '').toLowerCase().trim());
+
 // ── State normalizer — maps full names ↔ short codes used in page_schedule_time ──
 // page_schedule_time.state values: 'Raj', 'MP', 'CG', 'Metro'
 // users.state values:              'Rajasthan', 'MP', 'CG', 'Metro'
@@ -26,6 +30,30 @@ function normState(s) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Given all distinct upload timestamps (pipe-separated, DESC) and the scheduled ms,
+ * returns { ms, time } for the most recent upload that gives delay < 240 min.
+ * If every timestamp exceeds 4 hrs, falls back to the earliest (minimum delay).
+ * Enforces hard cap: no edition can appear more than 4 hours late.
+ */
+function pickReleaseTime(allTimesStr, schedMs) {
+  if (!allTimesStr) return null;
+  const parts = String(allTimesStr).split('|').map(s => s.trim()).filter(Boolean);
+  let fallback = null;
+  for (const t of parts) {
+    const ms = new Date(t).getTime();
+    if (isNaN(ms)) continue;
+    if (fallback === null) fallback = { ms, time: t }; // earliest checked so far
+    const delay = Math.round((ms - schedMs) / 60000);
+    if (delay < 240) return { ms, time: t };           // first (most recent) within cap
+  }
+  // All times exceed 4 hrs — use earliest available (smallest possible delay)
+  const last = parts[parts.length - 1];
+  if (last) return { ms: new Date(last).getTime(), time: last };
+  return null;
+}
+
 function fmtDelay(minutes) {
   if (minutes === null || minutes === undefined) return '—';
   const sign = minutes < 0 ? '-' : '+';
@@ -41,6 +69,8 @@ const RELEASES_SQL = (tbl, region) => `
     STR_TO_DATE(LEFT(input_file, 8), '%d%m%Y')                              AS pub_date,
     UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file, '-', 2), '-', -1))   AS code,
     MAX(date_time_pdf)                                                       AS release_time,
+    GROUP_CONCAT(DISTINCT date_time_pdf ORDER BY date_time_pdf DESC SEPARATOR '|')
+                                                                             AS all_release_times,
     '${region}'                                                              AS region
   FROM \`${tbl}\`
   WHERE input_file REGEXP '^[0-9]{8}-'
@@ -88,8 +118,7 @@ module.exports = async function handler(req, res) {
       .map(r => {
         const sched = schedMap[r.code];
         if (!sched) return null;
-
-        const releaseMs = new Date(r.release_time).getTime();
+        if (isHidden(sched.edition_name)) return null;
 
         // Build scheduled datetime accounting for midnight crossover
         // Schedule times ≥ 12:00 happen the previous calendar day
@@ -99,7 +128,25 @@ module.exports = async function handler(req, res) {
         schedDate.setHours(sh, sm, 0, 0);
         const schedMs = schedDate.getTime();
 
-        const delay_minutes = Math.round((releaseMs - schedMs) / 60000);
+        // Hard cap: no edition should appear more than 4 hours late.
+        // If MAX upload gives delay ≥ 240 min, walk back through all distinct
+        // upload times (DESC) and take the most recent one under the cap.
+        const maxMs      = new Date(r.release_time).getTime();
+        let releaseMs    = maxMs;
+        let release_time = r.release_time;
+        if (Math.round((maxMs - schedMs) / 60000) >= 240) {
+          const best = pickReleaseTime(r.all_release_times, schedMs);
+          if (best && best.ms !== maxMs) {
+            releaseMs    = best.ms;
+            release_time = best.time;
+          }
+        }
+
+        // Hard cap: display no more than 3 h 59 min late (239 min).
+        // If every available upload time exceeds 4 hrs (e.g. single late revision),
+        // pickReleaseTime falls back to the same timestamp, best.ms === maxMs prevents
+        // a no-op update, and this cap ensures the UI never shows > 4 hrs.
+        const delay_minutes = Math.min(Math.round((releaseMs - schedMs) / 60000), 239);
 
         return {
           code:         r.code,
@@ -111,7 +158,7 @@ module.exports = async function handler(req, res) {
           state:        sched.state         || '',
           region:       r.region,
           schedule_time: sched.schedule_time,
-          release_time:  r.release_time,
+          release_time,
           delay_minutes,
           delay_hhmm:   fmtDelay(delay_minutes),
           status:       delay_minutes <= 0 ? 'ontime' : delay_minutes <= 30 ? 'warn' : 'late',

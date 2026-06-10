@@ -30,6 +30,8 @@ const RELEASES_SQL = (tbl, region) => `
     STR_TO_DATE(LEFT(input_file, 8), '%d%m%Y')                             AS pub_date,
     UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file, '-', 2), '-', -1))   AS code,
     MAX(date_time_pdf)                                                      AS release_time,
+    GROUP_CONCAT(DISTINCT date_time_pdf ORDER BY date_time_pdf DESC SEPARATOR '|')
+                                                                            AS all_release_times,
     '${region}'                                                             AS region
   FROM \`${tbl}\`
   WHERE input_file REGEXP '^[0-9]{8}-'
@@ -37,6 +39,20 @@ const RELEASES_SQL = (tbl, region) => `
     AND STR_TO_DATE(LEFT(input_file, 8), '%d%m%Y') = ?
   GROUP BY pub_date, code
 `;
+
+// Walk back through all distinct upload times (DESC); return the most recent
+// that gives delay < 240 min, or the earliest available as a last resort.
+function pickReleaseTime(allTimesStr, schedMs) {
+  if (!allTimesStr) return null;
+  const parts = String(allTimesStr).split('|').map(s => s.trim()).filter(Boolean);
+  for (const t of parts) {
+    const ms = new Date(t).getTime();
+    if (isNaN(ms)) continue;
+    if (Math.round((ms - schedMs) / 60000) < 240) return { ms, time: t };
+  }
+  const last = parts[parts.length - 1];
+  return last ? { ms: new Date(last).getTime(), time: last } : null;
+}
 
 function fmtDelay(minutes) {
   const sign = minutes < 0 ? '-' : '+';
@@ -82,12 +98,23 @@ async function fetchDelayedByBranch(date) {
     const sched = schedMap[r.code];
     if (!sched) return;
 
-    const releaseMs = new Date(r.release_time).getTime();
     const [sh, sm]  = (sched.schedule_time || '00:00:00').split(':').map(Number);
     const schedDate = new Date(pubDate);
     if (sh >= 12) schedDate.setDate(schedDate.getDate() - 1);
     schedDate.setHours(sh, sm, 0, 0);
-    const delay_minutes = Math.round((releaseMs - schedDate.getTime()) / 60000);
+    const schedMs = schedDate.getTime();
+
+    // Hard cap: no edition more than 4 hours late.
+    const maxMs   = new Date(r.release_time).getTime();
+    let releaseMs = maxMs;
+    let release_time = r.release_time;
+    if (Math.round((maxMs - schedMs) / 60000) >= 240) {
+      const best = pickReleaseTime(r.all_release_times, schedMs);
+      if (best && best.ms !== maxMs) { releaseMs = best.ms; release_time = best.time; }
+    }
+
+    // Hard cap: treat any edition as no more than 3 h 59 min late (239 min).
+    const delay_minutes = Math.min(Math.round((releaseMs - schedMs) / 60000), 239);
 
     if (delay_minutes <= DELAY_WARN_MINUTES) return; // on time — skip
 
@@ -98,7 +125,7 @@ async function fetchDelayedByBranch(date) {
     byBranch[unit].editions.push({
       edition_name:  sched.edition_name || r.code,
       schedule_time: sched.schedule_time,
-      release_time:  r.release_time,
+      release_time,
       delay_minutes,
       delay_hhmm:   fmtDelay(delay_minutes),
     });
@@ -149,6 +176,11 @@ function buildMessage(branch, state, editions, reportDate) {
   lines.push(`⏱ Max Delay: <b>${fmtDelay(maxDelay)}</b>`);
   lines.push('');
   lines.push(`<i>Auto Report · Patrika Newsroom · 8:00 AM</i>`);
+  lines.push('');
+  lines.push(`📝 <b>Submit Delay Reason:</b>`);
+  lines.push(`Reply to this bot with your reason:`);
+  lines.push(`<code>REASON your reason here</code>`);
+  lines.push(`Example: <code>REASON Power outage at press</code>`);
 
   return lines.join('\n');
 }
@@ -238,9 +270,35 @@ async function ensureColumn() {
   }
 }
 
+// ── Auto-create delay_reasons table if missing ────────────────────────────────
+async function ensureDelayReasonsTable() {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS delay_reasons (
+        id                   INT AUTO_INCREMENT PRIMARY KEY,
+        branch               VARCHAR(200) NOT NULL,
+        state                VARCHAR(100) DEFAULT '',
+        pub_date             DATE         NOT NULL,
+        reason               TEXT         NOT NULL,
+        submitted_by_name    VARCHAR(200) DEFAULT '',
+        submitted_by_chat_id VARCHAR(50)  DEFAULT '',
+        submitted_at         DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_pub_date    (pub_date),
+        INDEX idx_branch_date (branch, pub_date)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log('[delay-report] ✅ delay_reasons table ready');
+  } catch (err) {
+    if (!err.message.includes('already exists')) {
+      console.warn('[delay-report] delay_reasons table warning:', err.message);
+    }
+  }
+}
+
 // ── Register cron — 8:00 AM IST every day ────────────────────────────────────
 function register() {
-  ensureColumn();   // run once on startup
+  ensureColumn();             // run once on startup
+  ensureDelayReasonsTable();  // create delay_reasons table if not exists
 
   // node-cron format: second(opt) minute hour day month weekday
   // 8:00 AM IST = 8:00 AM Asia/Kolkata
