@@ -1238,7 +1238,12 @@ function GradingTab({ emps, canEditHr, canViewHr }) {
                                 type="number" min="0" max="5" step="1"
                                 className="input py-0.5 text-sm text-center w-14"
                                 value={curVal}
-                                onChange={ev => setGrade(pan, c.key, ev.target.value)}
+                                onChange={ev => {
+                                  const v = ev.target.value;
+                                  if (v === '') { setGrade(pan, c.key, ''); return; }
+                                  const n = Math.round(Number(v));
+                                  if (!isNaN(n)) setGrade(pan, c.key, String(Math.min(5, Math.max(0, n))));
+                                }}
                                 style={{ color: scoreColor(curVal), fontWeight: 700 }}
                                 disabled={!pan}
                                 placeholder="—"
