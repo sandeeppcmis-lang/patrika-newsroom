@@ -514,7 +514,8 @@ function TelegramConfigModal({ onClose }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Production() {
-  const { t } = useApp();
+  const { t, user } = useApp();
+  const isAdmin = user?.role === 'Admin';
   const [activeTab,  setActiveTab]  = useState('monitor'); // 'monitor' | 'journey'
   const [date,       setDate]       = useState(today());
   const [data,       setData]       = useState(null);
