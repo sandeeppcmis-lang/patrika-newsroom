@@ -22,6 +22,15 @@ const { setCors, handleOptions } = require('../_lib/cors');
 const HIDDEN_EDITIONS = ['nt jaipur city', 'nt jaipur dak'];
 const isHidden = name => HIDDEN_EDITIONS.includes((name || '').toLowerCase().trim());
 
+// ── State normaliser — mirrors api/production.js ──────────────────────────────
+const STATE_NORM = {
+  'rajasthan': 'raj', 'raj': 'raj',
+  'mp': 'mp', 'madhya pradesh': 'mp',
+  'cg': 'cg', 'chhattisgarh': 'cg',
+  'metro': 'metro',
+};
+const normState = s => STATE_NORM[(s || '').toLowerCase().trim()] || (s || '').toLowerCase().trim();
+
 // ── Filename parser ───────────────────────────────────────────────────────────
 // Format: DDMMYYYY-EDITIONCODE-PAGEINFO.pdf
 // PAGEINFO examples: 01, 06_Bold, 03_north, 03_north_REV_1, 18_001, 13-Patrika Bold
@@ -78,7 +87,7 @@ module.exports = async function handler(req, res) {
   if (handleOptions(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { authError } = requireRole(req,
+  const { authError, user } = requireRole(req,
     ['Admin', 'State Head', 'Regional Editor', 'HR', 'Management']);
   if (authError) return res.status(authError.status).json({ error: authError.message });
 
@@ -212,7 +221,18 @@ module.exports = async function handler(req, res) {
         total_uploads,
       };
     // Sort by edition_name for friendly display order
-    }).sort((a, b) => (a.edition_name || a.code).localeCompare(b.edition_name || b.code));
+    }).sort((a, b) => (a.edition_name || a.code).localeCompare(b.edition_name || b.code))
+    // ── Role-based scope (mirrors api/production.js) ──────────────────────
+    .filter(e => {
+      if (user.role === 'State Head' && user.state) {
+        return normState(e.state) === normState(user.state);
+      }
+      if (user.role === 'Regional Editor') {
+        if (user.state  && normState(e.state)  !== normState(user.state))              return false;
+        if (user.branch && (e.unit || '').toLowerCase() !== user.branch.toLowerCase()) return false;
+      }
+      return true;
+    });
 
     return res.json({ date, editions });
 
