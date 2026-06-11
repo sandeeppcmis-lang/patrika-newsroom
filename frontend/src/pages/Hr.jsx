@@ -823,28 +823,15 @@ function CandidateModal({ onClose, onSave }) {
 const TRAINING_TYPES = ['AI', 'Excel', 'Other'];
 
 function TrainingTab({ emps, canEditHr }) {
-  const { availableStates, getBranchesForState } = useApp();
-
   const [records,    setRecords]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [filterType, setFilterType] = useState('all');
-  const [localState, setLocalState] = useState('All');
-  const [localBranch,setLocalBranch]= useState('All');
   const [markModal,  setMarkModal]  = useState(null);
   const [saving,     setSaving]     = useState(false);
 
   useEffect(() => {
     api.hrTraining().then(d => setRecords(d || [])).finally(() => setLoading(false));
   }, []);
-
-  // Sync localState when role/locations change
-  useEffect(() => {
-    if (!availableStates.includes(localState)) {
-      const def = availableStates.includes('All') ? 'All' : (availableStates[0] || 'All');
-      setLocalState(def);
-      setLocalBranch('All');
-    }
-  }, [availableStates.join(',')]); // eslint-disable-line
 
   // Build lookup: emp_code|training_type → record
   const lookup = useMemo(() => {
@@ -859,8 +846,6 @@ function TrainingTab({ emps, canEditHr }) {
   const workingEmps = useMemo(() =>
     emps.filter(e => e.Status === 'Working' || e.is_emp_working == 1 || e.Status === 'Active'),
   [emps]);
-
-  const handleStateChange = (s) => { setLocalState(s); setLocalBranch('All'); };
 
   const handleMark = async (empCode, empName, type, trainingName, status, date) => {
     setSaving(true);
@@ -897,18 +882,16 @@ function TrainingTab({ emps, canEditHr }) {
     XLSX.writeFile(wb, `training_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  // Apply state + branch + training-type filter
+  // Apply training-type filter only (state/branch already filtered by global top-left selector)
   const displayEmps = useMemo(() => {
     return workingEmps.filter(e => {
-      if (localState  !== 'All' && e.State  !== localState)  return false;
-      if (localBranch !== 'All' && e.Branch !== localBranch) return false;
-      if (filterType  !== 'all') {
+      if (filterType !== 'all') {
         const r = getRecord(e.EMP_CODE, filterType);
         return !r || r.status !== 'completed';
       }
       return true;
     });
-  }, [workingEmps, localState, localBranch, filterType, lookup]);
+  }, [workingEmps, filterType, lookup]);
 
   const summary = useMemo(() => {
     let completed = 0, required = 0;
@@ -932,18 +915,12 @@ function TrainingTab({ emps, canEditHr }) {
       <SectionCard title={`Training Status — Active (${displayEmps.length})`}>
         {/* ── One-line filters ─────────────────────────────────────────── */}
         <div className="flex flex-wrap gap-2 mb-3">
-          <select value={localState} onChange={e => handleStateChange(e.target.value)} className="input py-1.5 text-sm">
-            {availableStates.map(s => <option key={s} value={s}>{s === 'All' ? 'All States' : s}</option>)}
-          </select>
-          <select value={localBranch} onChange={e => setLocalBranch(e.target.value)} disabled={localState === 'All'} className="input py-1.5 text-sm disabled:opacity-40">
-            {getBranchesForState(localState).map(b => <option key={b} value={b}>{b === 'All' ? 'All Branches' : b}</option>)}
-          </select>
           <select value={filterType} onChange={e => setFilterType(e.target.value)} className="input py-1.5 text-sm">
             <option value="all">All Types</option>
             {TRAINING_TYPES.map(t => <option key={t} value={t}>{t} — Pending</option>)}
           </select>
-          {(localState !== 'All' || localBranch !== 'All' || filterType !== 'all') && (
-            <button onClick={() => { setLocalState('All'); setLocalBranch('All'); setFilterType('all'); }} className="btn-ghost py-1.5 text-sm">
+          {filterType !== 'all' && (
+            <button onClick={() => setFilterType('all')} className="btn-ghost py-1.5 text-sm">
               <X size={13} className="inline mr-1" />Clear
             </button>
           )}
