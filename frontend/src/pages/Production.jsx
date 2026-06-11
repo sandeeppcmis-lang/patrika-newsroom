@@ -649,8 +649,8 @@ export default function Production() {
         {[
           { id: 'monitor', label: 'Production Monitor', icon: LayoutList },
           { id: 'journey', label: 'Page Journey',       icon: GitBranch  },
-          { id: 'weekly',  label: 'Weekly Trend',       icon: BarChart2  },
-        ].map(({ id, label, icon: Icon }) => (
+          { id: 'weekly',  label: 'Weekly Trend',       icon: BarChart2, adminOnly: true },
+        ].filter(tab => !tab.adminOnly || isAdmin).map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setActiveTab(id)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition -mb-px ${
               activeTab === id
