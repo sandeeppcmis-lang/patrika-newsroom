@@ -58,7 +58,7 @@ module.exports = async function handler(req, res) {
   try {
     switch (type) {
       case 'reporter':  return await reportReporter (req, res, filterState, filterBranch);
-      case 'edition':   return await reportEdition  (req, res, filterState);
+      case 'edition':   return await reportEdition  (req, res, filterState, filterBranch);
       case 'qc':        return await reportQC       (req, res, filterState);
       case 'visits':    return await reportVisits   (req, res, filterState, filterBranch);
       case 'grading':   return await reportGrading  (req, res, filterState, filterBranch);
@@ -115,18 +115,35 @@ async function reportReporter(req, res, filterState, filterBranch) {
 }
 
 /* ── 2. Edition Delays ───────────────────────────────────────────────────── */
-async function reportEdition(req, res, filterState) {
+const HIDDEN_EDITIONS = ['nt jaipur city', 'nt jaipur dak'];
+const isHidden = name => HIDDEN_EDITIONS.includes((name || '').toLowerCase().trim());
+
+function pickReleaseTime(allTimesStr, schedMs) {
+  if (!allTimesStr) return null;
+  const parts = String(allTimesStr).split('|').map(s => s.trim()).filter(Boolean);
+  for (const t of parts) {
+    const ms = new Date(t).getTime();
+    if (isNaN(ms)) continue;
+    if (Math.round((ms - schedMs) / 60000) < 240) return ms;
+  }
+  const last = parts[parts.length - 1];
+  return last ? new Date(last).getTime() : null;
+}
+
+async function reportEdition(req, res, filterState, filterBranch) {
   const date = req.query.date || yday();
 
   const [rajRows, mpcgRows, schedRows] = await Promise.all([
     query(`SELECT UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file,'-',2),'-',-1)) AS code,
-                  MAX(date_time_pdf) AS release_time, 'Rajasthan' AS region
+                  MAX(date_time_pdf) AS release_time, 'Rajasthan' AS region,
+                  GROUP_CONCAT(DISTINCT date_time_pdf ORDER BY date_time_pdf DESC SEPARATOR '|') AS all_release_times
            FROM gmg_raj
            WHERE input_file REGEXP '^[0-9]{8}-' AND date_time_pdf IS NOT NULL
              AND STR_TO_DATE(LEFT(input_file,8),'%d%m%Y') = ?
            GROUP BY code`, [date]).catch(() => []),
     query(`SELECT UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file,'-',2),'-',-1)) AS code,
-                  MAX(date_time_pdf) AS release_time, 'MP/CG' AS region
+                  MAX(date_time_pdf) AS release_time, 'MP/CG' AS region,
+                  GROUP_CONCAT(DISTINCT date_time_pdf ORDER BY date_time_pdf DESC SEPARATOR '|') AS all_release_times
            FROM gmg_mpcg
            WHERE input_file REGEXP '^[0-9]{8}-' AND date_time_pdf IS NOT NULL
              AND STR_TO_DATE(LEFT(input_file,8),'%d%m%Y') = ?
@@ -143,14 +160,24 @@ async function reportEdition(req, res, filterState) {
     .map(r => {
       const s = schedMap[r.code];
       if (!s) return null;
-      if (filterState && normState(s.state) !== normState(filterState)) return null;
+      if (isHidden(s.edition_name)) return null;
+      if (filterState  && normState(s.state) !== normState(filterState))          return null;
+      if (filterBranch && (s.unit || '').toLowerCase() !== filterBranch.toLowerCase()) return null;
 
       const [sh, sm] = (s.schedule_time||'00:00:00').split(':').map(Number);
       const sd = new Date(pubDate);
       if (sh >= 12) sd.setDate(sd.getDate() - 1);
       sd.setHours(sh, sm, 0, 0);
+      const schedMs = sd.getTime();
 
-      const delay = Math.round((new Date(r.release_time) - sd) / 60000);
+      const maxMs = new Date(r.release_time).getTime();
+      let releaseMs = maxMs;
+      if (Math.round((maxMs - schedMs) / 60000) >= 240) {
+        const best = pickReleaseTime(r.all_release_times, schedMs);
+        if (best && best !== maxMs) releaseMs = best;
+      }
+
+      const delay = Math.min(Math.round((releaseMs - schedMs) / 60000), 239);
       const abs   = Math.abs(delay);
       const hh    = Math.floor(abs / 60), mm = abs % 60;
       const fmt   = `${delay > 0 ? '+' : delay < 0 ? '-' : ''}${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
