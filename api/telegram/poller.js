@@ -146,12 +146,25 @@ async function processMessage(token, msg) {
   // Format: REASON <text>   (case-insensitive)
   const reasonMatch = text.match(/^REASON\s+(.+)$/i);
   if (reasonMatch) {
-    const reasonText = reasonMatch[1].trim();
+    let reasonText = reasonMatch[1].trim();
     if (!reasonText) {
       await sendMsg(token, chatId,
-        `❌ Please include your reason.\nExample: <code>REASON Power outage at press</code>`
+        `❌ Please include your reason.\nExample: <code>REASON 2026-06-11 Power outage at press</code>`
       );
       return;
+    }
+
+    // Optional date prefix: REASON YYYY-MM-DD <text>
+    let pubDate;
+    const datePrefix = reasonText.match(/^(\d{4}-\d{2}-\d{2})\s+(.+)$/);
+    if (datePrefix) {
+      pubDate = datePrefix[1];
+      reasonText = datePrefix[2].trim();
+    } else {
+      // No date given — default to yesterday (the usual 8 AM cron report date)
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      pubDate = d.toISOString().slice(0, 10);
     }
 
     // Look up the sender by chat_id
@@ -169,11 +182,6 @@ async function processMessage(token, msg) {
     }
 
     const u = userRows[0];
-
-    // Default to yesterday (the date the delay report covers)
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    const pubDate = d.toISOString().slice(0, 10);
 
     try {
       await query(

@@ -179,8 +179,8 @@ function buildMessage(branch, state, editions, reportDate) {
   lines.push('');
   lines.push(`📝 <b>Submit Delay Reason:</b>`);
   lines.push(`Reply to this bot with your reason:`);
-  lines.push(`<code>REASON your reason here</code>`);
-  lines.push(`Example: <code>REASON Power outage at press</code>`);
+  lines.push(`<code>REASON ${reportDate} your reason here</code>`);
+  lines.push(`Example: <code>REASON ${reportDate} Power outage at press</code>`);
 
   return lines.join('\n');
 }
