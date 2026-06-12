@@ -39,17 +39,21 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    // Use range comparisons (col >= start AND col < end) so MySQL can use the
+    // index on entrydate instead of doing a full-table function scan.
+    const todayStr = toIST(Date.now());
     const ydayStr  = toIST(Date.now() - 864e5);
     const day3Str  = toIST(Date.now() - 3  * 864e5);
     const day7Str  = toIST(Date.now() - 7  * 864e5);
     const day30Str = toIST(Date.now() - 30 * 864e5);
 
-    // Build per-table WHERE helpers
     const sF = filterState, bF = filterBranch;
-    const ecmsExtra = [
-      sF ? 'Pan_no IN (SELECT pan_no FROM `user` WHERE State = ?)' : '',
-      bF ? 'Pan_no IN (SELECT pan_no FROM `user` WHERE Branch = ?)' : '',
-    ].filter(Boolean).map(c => ' AND ' + c).join('');
+
+    // For queries 1/5 that filter ecms by state/branch via subquery
+    const ecmsExtra  = [
+      sF ? 'AND Pan_no IN (SELECT pan_no FROM `user` WHERE State = ?)' : '',
+      bF ? 'AND Pan_no IN (SELECT pan_no FROM `user` WHERE Branch = ?)' : '',
+    ].filter(Boolean).join(' ');
     const ecmsParams = [...(sF ? [sF] : []), ...(bF ? [bF] : [])];
 
     const qcExtra  = sF ? ' AND state = ?' : '';
@@ -64,40 +68,40 @@ module.exports = async function handler(req, res) {
       zeroRow,
     ] = await Promise.all([
 
-      // 1. Yesterday totals
+      // 1. Yesterday totals — range comparison enables entrydate index
       query(`SELECT SUM(No_Story) AS stories, SUM(No_Photo) AS photos,
                     COUNT(DISTINCT Pan_no) AS reporters, SUM(No_Words) AS words
              FROM daily_achievment_count_ecms
-             WHERE DATE_FORMAT(entrydate,'%Y-%m-%d') = ?${ecmsExtra}`,
-            [ydayStr, ...ecmsParams]).catch(() => [{}]),
+             WHERE entrydate >= ? AND entrydate < ? ${ecmsExtra}`,
+            [ydayStr, todayStr, ...ecmsParams]).catch(() => [{}]),
 
-      // 2. Reporter performance: 7d stories vs 30d base
+      // 2. Reporter trends: 7d vs 30d — range on entrydate, CASE WHEN also range
       query(`SELECT e.Pan_no,
                     u.EMPNAME, u.Branch, u.State,
-                    SUM(CASE WHEN DATE_FORMAT(e.entrydate,'%Y-%m-%d') >= ? THEN e.No_Story ELSE 0 END) AS s7d,
+                    SUM(CASE WHEN e.entrydate >= ? THEN e.No_Story ELSE 0 END) AS s7d,
                     SUM(e.No_Story) AS s30d,
-                    COUNT(DISTINCT CASE WHEN DATE_FORMAT(e.entrydate,'%Y-%m-%d') >= ? AND e.No_Story > 0
-                          THEN DATE_FORMAT(e.entrydate,'%Y-%m-%d') END) AS active7d
+                    COUNT(DISTINCT CASE WHEN e.entrydate >= ? AND e.No_Story > 0
+                          THEN DATE(e.entrydate) END) AS active7d
              FROM daily_achievment_count_ecms e
              JOIN \`user\` u ON e.Pan_no = u.pan_no
-             WHERE DATE_FORMAT(e.entrydate,'%Y-%m-%d') BETWEEN ? AND ?
+             WHERE e.entrydate >= ? AND e.entrydate < ?
                ${sF ? 'AND u.State = ?'  : ''}
                ${bF ? 'AND u.Branch = ?' : ''}
              GROUP BY e.Pan_no, u.EMPNAME, u.Branch, u.State
              ORDER BY s7d DESC
              LIMIT 100`,
-            [day7Str, day7Str, day30Str, ydayStr,
+            [day7Str, day7Str, day30Str, todayStr,
              ...(sF ? [sF] : []), ...(bF ? [bF] : [])]).catch(() => []),
 
-      // 3. Coverage gaps: beats (Story_Type) with zero/low stories in 3 days
+      // 3. Coverage gaps: beats with zero/low stories in last 3 days
       query(`SELECT u.Story_Type AS beat,
                     COUNT(DISTINCT u.pan_no) AS reporters,
                     COALESCE(SUM(e.No_Story), 0) AS stories3d,
-                    MAX(DATE_FORMAT(e.entrydate,'%Y-%m-%d')) AS lastStory
+                    MAX(DATE(e.entrydate)) AS lastStory
              FROM \`user\` u
              LEFT JOIN daily_achievment_count_ecms e
                ON e.Pan_no = u.pan_no
-               AND DATE_FORMAT(e.entrydate,'%Y-%m-%d') >= ?
+               AND e.entrydate >= ? AND e.entrydate < ?
              WHERE (u.is_emp_working = 1 OR u.Status = 'Working' OR u.Status = 'Active')
                AND u.Story_Type IS NOT NULL AND u.Story_Type != ''
                ${sF ? 'AND u.State = ?'  : ''}
@@ -105,7 +109,7 @@ module.exports = async function handler(req, res) {
              GROUP BY u.Story_Type
              ORDER BY stories3d ASC, reporters DESC
              LIMIT 20`,
-            [day3Str, ...(sF ? [sF] : []), ...(bF ? [bF] : [])]).catch(() => []),
+            [day3Str, todayStr, ...(sF ? [sF] : []), ...(bF ? [bF] : [])]).catch(() => []),
 
       // 4. QC hotspots by state — last 7 days
       query(`SELECT state,
@@ -113,36 +117,38 @@ module.exports = async function handler(req, res) {
                     COUNT(*) AS checks,
                     ROUND(AVG(no_of_mistake), 1) AS avgPerCheck
              FROM qc_review
-             WHERE DATE_FORMAT(entrydate,'%Y-%m-%d') BETWEEN ? AND ?${qcExtra}
+             WHERE entrydate >= ? AND entrydate < ?${qcExtra}
              GROUP BY state
              ORDER BY mistakes7d DESC
              LIMIT 8`,
-            [day7Str, ydayStr, ...qcParams]).catch(() => []),
+            [day7Str, todayStr, ...qcParams]).catch(() => []),
 
-      // 5. Top 3 reporters yesterday (for briefing text)
+      // 5. Top 3 reporters yesterday
       query(`SELECT u.EMPNAME, u.Branch, SUM(e.No_Story) AS stories
              FROM daily_achievment_count_ecms e
              JOIN \`user\` u ON e.Pan_no = u.pan_no
-             WHERE DATE_FORMAT(e.entrydate,'%Y-%m-%d') = ?
+             WHERE e.entrydate >= ? AND e.entrydate < ?
                ${sF ? 'AND u.State = ?'  : ''}
                ${bF ? 'AND u.Branch = ?' : ''}
              GROUP BY e.Pan_no, u.EMPNAME, u.Branch
              ORDER BY stories DESC
              LIMIT 3`,
-            [ydayStr, ...(sF ? [sF] : []), ...(bF ? [bF] : [])]).catch(() => []),
+            [ydayStr, todayStr, ...(sF ? [sF] : []), ...(bF ? [bF] : [])]).catch(() => []),
 
-      // 6. Count reporters with zero stories yesterday
+      // 6. Reporters with zero stories yesterday — NOT EXISTS is much faster than NOT IN
       query(`SELECT COUNT(DISTINCT u.pan_no) AS cnt
              FROM \`user\` u
              WHERE (u.is_emp_working = 1 OR u.Status = 'Working' OR u.Status = 'Active')
                AND u.Story_Type IS NOT NULL AND u.Story_Type != ''
                ${sF ? 'AND u.State = ?'  : ''}
                ${bF ? 'AND u.Branch = ?' : ''}
-               AND u.pan_no NOT IN (
-                 SELECT Pan_no FROM daily_achievment_count_ecms
-                 WHERE DATE_FORMAT(entrydate,'%Y-%m-%d') = ? AND No_Story > 0
+               AND NOT EXISTS (
+                 SELECT 1 FROM daily_achievment_count_ecms e
+                 WHERE e.Pan_no = u.pan_no
+                   AND e.entrydate >= ? AND e.entrydate < ?
+                   AND e.No_Story > 0
                )`,
-            [...(sF ? [sF] : []), ...(bF ? [bF] : []), ydayStr]).catch(() => [{ cnt: 0 }]),
+            [...(sF ? [sF] : []), ...(bF ? [bF] : []), ydayStr, todayStr]).catch(() => [{ cnt: 0 }]),
     ]);
 
     // ── Shape reporter trends ─────────────────────────────────────────────────
