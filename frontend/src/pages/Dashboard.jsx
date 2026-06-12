@@ -60,7 +60,7 @@ export default function Dashboard() {
         <KPICard
           label="Field Visits"
           value={k.visits ?? '—'}
-          sub="today"
+          sub="yesterday"
           accent="#16a34a"
           icon={MapPin}
         />

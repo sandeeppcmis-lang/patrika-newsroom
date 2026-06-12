@@ -65,12 +65,10 @@ module.exports = async function handler(req, res) {
     const filterState  = state  && state  !== 'All' ? state  : '';
     const filterBranch = branch && branch !== 'All' ? branch : '';
 
-    // ── Date helpers ──────────────────────────────────────────────────────────
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const yday     = new Date(); yday.setDate(yday.getDate() - 1);
-    const ydayStr  = yday.toISOString().slice(0, 10);
-    const trend7   = new Date(); trend7.setDate(trend7.getDate() - 6);
-    const trend7Str= trend7.toISOString().slice(0, 10);
+    // ── Date helpers (IST-aware) ──────────────────────────────────────────────
+    const istNow   = d => new Date(d.getTime() + 5.5 * 3600000).toISOString().slice(0, 10);
+    const ydayStr  = istNow(new Date(Date.now() - 864e5));
+    const trend7Str= istNow(new Date(Date.now() - 7 * 864e5)); // 7 days back → 7-day window ending yesterday
 
     // ── WHERE helpers ─────────────────────────────────────────────────────────
     const empWhere    = ["(is_emp_working = 1 OR Status = 'Working' OR Status = 'Active')"];
@@ -145,9 +143,9 @@ module.exports = async function handler(req, res) {
              GROUP BY DATE(entrydate) ORDER BY d ASC`,
              [trend7Str, ydayStr, ...qcParams]).catch(() => []),
 
-      // 7. Field visits today
+      // 7. Field visits yesterday
       query(`SELECT COUNT(*) AS cnt FROM visit_report WHERE DATE(visit_date) = ?${visitExtra}`,
-             [todayStr, ...visitParams]).catch(() => [{ cnt: 0 }]),
+             [ydayStr, ...visitParams]).catch(() => [{ cnt: 0 }]),
 
       // 8. Active legal cases
       query(`SELECT COUNT(*) AS cnt FROM legal_cases WHERE ${legalWhere.join(' AND ')}`, legalParams)
@@ -239,8 +237,9 @@ module.exports = async function handler(req, res) {
 
     const trend7days = [];
     for (let i = 6; i >= 0; i--) {
-      const dt = new Date(); dt.setDate(dt.getDate() - 1 - i);
-      const ds = dt.toISOString().slice(0, 10);
+      // Use IST offset so dates match MySQL stored values
+      const ds    = istNow(new Date(Date.now() - (i + 1) * 864e5));
+      const dt    = new Date(ds + 'T00:00:00+05:30');
       const label = dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
       trend7days.push({
         date:    ds,
