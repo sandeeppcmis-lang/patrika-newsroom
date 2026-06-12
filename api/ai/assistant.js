@@ -13,7 +13,7 @@ const SCHEMA = () => `
 MySQL 8.0 database (editorial_reports). Tables:
 - daily_achievment_count_ecms(Pan_no VARCHAR, entrydate DATE, No_Story INT, No_Photo INT, No_Words INT, Exclusive INT)
   → reporter daily production. Join on Pan_no = user.pan_no
-- user(pan_no VARCHAR, Name VARCHAR, Branch VARCHAR, State VARCHAR, Story_Type VARCHAR, Status VARCHAR, is_emp_working TINYINT)
+- user(pan_no VARCHAR, EMPNAME VARCHAR, EMP_CODE VARCHAR, Branch VARCHAR, State VARCHAR, Story_Type VARCHAR, Status VARCHAR, is_emp_working TINYINT)
   → active reporters: is_emp_working=1 OR Status='Working' OR Status='Active'
 - qc_review(id INT, entrydate DATE, no_of_mistake INT, state VARCHAR, branch VARCHAR)
   → quality check mistakes

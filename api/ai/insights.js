@@ -73,7 +73,7 @@ module.exports = async function handler(req, res) {
 
       // 2. Reporter performance: 7d stories vs 30d base
       query(`SELECT e.Pan_no,
-                    u.Name, u.Branch, u.State,
+                    u.EMPNAME, u.Branch, u.State,
                     SUM(CASE WHEN DATE_FORMAT(e.entrydate,'%Y-%m-%d') >= ? THEN e.No_Story ELSE 0 END) AS s7d,
                     SUM(e.No_Story) AS s30d,
                     COUNT(DISTINCT CASE WHEN DATE_FORMAT(e.entrydate,'%Y-%m-%d') >= ? AND e.No_Story > 0
@@ -83,7 +83,7 @@ module.exports = async function handler(req, res) {
              WHERE DATE_FORMAT(e.entrydate,'%Y-%m-%d') BETWEEN ? AND ?
                ${sF ? 'AND u.State = ?'  : ''}
                ${bF ? 'AND u.Branch = ?' : ''}
-             GROUP BY e.Pan_no, u.Name, u.Branch, u.State
+             GROUP BY e.Pan_no, u.EMPNAME, u.Branch, u.State
              ORDER BY s7d DESC
              LIMIT 100`,
             [day7Str, day7Str, day30Str, ydayStr,
@@ -120,13 +120,13 @@ module.exports = async function handler(req, res) {
             [day7Str, ydayStr, ...qcParams]).catch(() => []),
 
       // 5. Top 3 reporters yesterday (for briefing text)
-      query(`SELECT u.Name, u.Branch, SUM(e.No_Story) AS stories
+      query(`SELECT u.EMPNAME, u.Branch, SUM(e.No_Story) AS stories
              FROM daily_achievment_count_ecms e
              JOIN \`user\` u ON e.Pan_no = u.pan_no
              WHERE DATE_FORMAT(e.entrydate,'%Y-%m-%d') = ?
                ${sF ? 'AND u.State = ?'  : ''}
                ${bF ? 'AND u.Branch = ?' : ''}
-             GROUP BY e.Pan_no, u.Name, u.Branch
+             GROUP BY e.Pan_no, u.EMPNAME, u.Branch
              ORDER BY stories DESC
              LIMIT 3`,
             [ydayStr, ...(sF ? [sF] : []), ...(bF ? [bF] : [])]).catch(() => []),
@@ -158,9 +158,9 @@ module.exports = async function handler(req, res) {
         trend = 'up';
       }
       return {
-        name:      r.Name   || '—',
-        branch:    r.Branch || '—',
-        state:     r.State  || '—',
+        name:      r.EMPNAME || '—',
+        branch:    r.Branch  || '—',
+        state:     r.State   || '—',
         stories7d: s7d,
         avg7d:     avg7,
         active7d:  Number(r.active7d || 0),
@@ -190,7 +190,7 @@ module.exports = async function handler(req, res) {
       reporters:     Number(ydayStats[0]?.reporters  || 0),
       words:         Number(ydayStats[0]?.words      || 0),
       zeroReporters: Number(zeroRow[0]?.cnt          || 0),
-      topReporters:  topYday.map(r => `${r.Name} (${r.Branch || r.State}, ${r.stories} stories)`),
+      topReporters:  topYday.map(r => `${r.EMPNAME} (${r.Branch || r.State}, ${r.stories} stories)`),
       criticalGaps:  contentGaps.filter(g => g.severity === 'critical').map(g => g.beat).slice(0, 4),
       qcHotspot:     qcHotRows[0]
         ? `${qcHotRows[0].state} (${qcHotRows[0].mistakes7d} mistakes)`
