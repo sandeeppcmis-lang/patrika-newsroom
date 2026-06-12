@@ -104,6 +104,14 @@ app.all('/api/hr/test-db',            h('./api/hr/test-db'));
 app.all('/api/feedback/:id',          h('./api/feedback/[id]'));
 app.all('/api/feedback',              h('./api/feedback'));
 
+// ── Archive ───────────────────────────────────────────────────────────────────
+app.all('/api/archive/:id/transcribe', h('./api/archive/transcribe'));
+app.all('/api/archive/:id',            h('./api/archive/[id]'));
+app.post('/api/archive',               require('./api/archive'));   // multipart upload
+app.get('/api/archive',                h('./api/archive'));
+// Serve uploaded archive files
+app.use('/uploads/archive', require('express').static(require('path').join(__dirname, 'uploads', 'archive')));
+
 // ── AI ────────────────────────────────────────────────────────────────────────
 app.all('/api/ai/assistant',          h('./api/ai/assistant'));
 
