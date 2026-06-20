@@ -92,10 +92,10 @@ async function reportReporter(req, res, filterState, filterBranch) {
            SUM(e.Datastory)       AS datastory,
            SUM(e.Expose_khulasa)  AS expose,
            SUM(e.Impact_Story)    AS impact,
-           COUNT(DISTINCT DATE(e.entrydate)) AS active_days
+           COUNT(DISTINCT e.entrydate) AS active_days
     FROM daily_achievment_count_ecms e
     JOIN \`user\` u ON e.Pan_no = u.pan_no
-    WHERE DATE(e.entrydate) BETWEEN ? AND ?${wSql}
+    WHERE e.entrydate BETWEEN ? AND ?${wSql}
     GROUP BY u.pan_no, u.EMPNAME, u.State, u.Branch, u.Story_Type
     ORDER BY stories DESC
     LIMIT 5000
@@ -132,22 +132,24 @@ function pickReleaseTime(allTimesStr, schedMs) {
 
 async function reportEdition(req, res, filterState, filterBranch) {
   const date = req.query.date || yday();
+  // GMG file names start with the publish date as ddmmyyyy → a LIKE prefix uses the
+  // index on input_file instead of scanning (STR_TO_DATE/REGEXP defeated the index).
+  const [pY, pM, pD] = date.split('-');
+  const datePrefix   = `${pD}${pM}${pY}-%`;
 
   const [rajRows, mpcgRows, schedRows] = await Promise.all([
     query(`SELECT UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file,'-',2),'-',-1)) AS code,
                   MAX(date_time_pdf) AS release_time, 'Rajasthan' AS region,
                   GROUP_CONCAT(DISTINCT date_time_pdf ORDER BY date_time_pdf DESC SEPARATOR '|') AS all_release_times
            FROM gmg_raj
-           WHERE input_file REGEXP '^[0-9]{8}-' AND date_time_pdf IS NOT NULL
-             AND STR_TO_DATE(LEFT(input_file,8),'%d%m%Y') = ?
-           GROUP BY code`, [date]).catch(() => []),
+           WHERE input_file LIKE ? AND date_time_pdf IS NOT NULL
+           GROUP BY code`, [datePrefix]).catch(() => []),
     query(`SELECT UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file,'-',2),'-',-1)) AS code,
                   MAX(date_time_pdf) AS release_time, 'MP/CG' AS region,
                   GROUP_CONCAT(DISTINCT date_time_pdf ORDER BY date_time_pdf DESC SEPARATOR '|') AS all_release_times
            FROM gmg_mpcg
-           WHERE input_file REGEXP '^[0-9]{8}-' AND date_time_pdf IS NOT NULL
-             AND STR_TO_DATE(LEFT(input_file,8),'%d%m%Y') = ?
-           GROUP BY code`, [date]).catch(() => []),
+           WHERE input_file LIKE ? AND date_time_pdf IS NOT NULL
+           GROUP BY code`, [datePrefix]).catch(() => []),
     query('SELECT UPPER(file_name) AS code, file_name, state, unit, district, edition_name, edition_type, schedule_time FROM page_schedule_time')
       .catch(() => []),
   ]);
@@ -215,11 +217,11 @@ async function reportQC(req, res, filterState) {
   const from = req.query.from || daysAgo(7);
   const to   = req.query.to   || yday();
 
-  const where = ['DATE(entrydate) BETWEEN ? AND ?']; const params = [from, to];
+  const where = ['entrydate BETWEEN ? AND ?']; const params = [from, to];
   if (filterState) { where.push('state = ?'); params.push(filterState); }
 
   const rows = await query(`
-    SELECT DATE(entrydate) AS date, state, edition, pullout, category, severity,
+    SELECT entrydate AS date, state, edition, pullout, category, severity,
            mistake, no_of_mistake AS mistakes, responsible_1, responsible_2, re_remark
     FROM qc_review WHERE ${where.join(' AND ')}
     ORDER BY entrydate DESC, id DESC LIMIT 5000
@@ -242,12 +244,12 @@ async function reportVisits(req, res, filterState, filterBranch) {
   const from = req.query.from || daysAgo(7);
   const to   = req.query.to   || yday();
 
-  const where = ['DATE(v.visit_date) BETWEEN ? AND ?']; const params = [from, to];
+  const where = ['v.visit_date BETWEEN ? AND ?']; const params = [from, to];
   if (filterState)  { where.push('u.State = ?');  params.push(filterState); }
   if (filterBranch) { where.push('u.Branch = ?'); params.push(filterBranch); }
 
   const rows = await query(`
-    SELECT DATE(v.visit_date) AS date, v.pan_no,
+    SELECT v.visit_date AS date, v.pan_no,
            u.EMPNAME AS name, u.State AS state, u.Branch AS branch,
            TRIM(u.Story_Type) AS profile,
            TIME(v.visit_in_time) AS time_in, TIME(v.visit_out_time) AS time_out,

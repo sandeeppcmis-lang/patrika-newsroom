@@ -75,8 +75,7 @@ const JOURNEY_SQL = `
     MAX(date_time_pdf)  AS last_time,
     COUNT(*)            AS upload_count
   FROM \`{TABLE}\`
-  WHERE input_file REGEXP '^[0-9]{8}-'
-    AND STR_TO_DATE(LEFT(input_file, 8), '%d%m%Y') = ?
+  WHERE input_file LIKE ?
   GROUP BY input_file
   ORDER BY MIN(date_time_pdf) ASC
 `;
@@ -92,11 +91,15 @@ module.exports = async function handler(req, res) {
   if (authError) return res.status(authError.status).json({ error: authError.message });
 
   const date = req.query.date || new Date().toISOString().slice(0, 10);
+  // GMG file names start with the publish date as ddmmyyyy → a LIKE prefix uses the
+  // index on input_file instead of scanning (STR_TO_DATE/REGEXP defeated the index).
+  const [pY, pM, pD] = date.split('-');
+  const datePrefix   = `${pD}${pM}${pY}-%`;
 
   try {
     const [rajRows, mpcgRows, schedRows] = await Promise.all([
-      query(JOURNEY_SQL.replace('{TABLE}', 'gmg_raj'),  [date]).catch(() => []),
-      query(JOURNEY_SQL.replace('{TABLE}', 'gmg_mpcg'), [date]).catch(() => []),
+      query(JOURNEY_SQL.replace('{TABLE}', 'gmg_raj'),  [datePrefix]).catch(() => []),
+      query(JOURNEY_SQL.replace('{TABLE}', 'gmg_mpcg'), [datePrefix]).catch(() => []),
       // Fetch edition name + scheduled page count from schedule table
       query(`SELECT UPPER(file_name) AS code, edition_name, unit, district, state, edition_type,
                     COUNT(*) AS scheduled_pages

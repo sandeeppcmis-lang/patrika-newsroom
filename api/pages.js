@@ -99,59 +99,59 @@ module.exports = async function handler(req, res) {
           SUM(Routine_News) AS routine, SUM(Press_Note) AS press_note,
           SUM(Tippani) AS tippani, SUM(Patrika_View) AS patrika_view,
           SUM(Others) AS others
-        FROM daily_achievment_count_ecms WHERE DATE(entrydate) = ?${ecmsWhere}`,
+        FROM daily_achievment_count_ecms WHERE entrydate = ?${ecmsWhere}`,
         [date, ...ecmsParams]).catch(() => [{}]),
 
       // ── News: 7-day trend ───────────────────────────────────────────────────
-      query(`SELECT DATE(entrydate) AS d,
+      query(`SELECT entrydate AS d,
           SUM(No_Story) AS stories, SUM(No_Words) AS words, SUM(No_Photo) AS photos,
           SUM(Exclusive) AS exclusive, SUM(Routine_News) AS routine,
           SUM(Human_angle) AS human_angle, SUM(Datastory) AS datastory
         FROM daily_achievment_count_ecms
-        WHERE DATE(entrydate) BETWEEN ? AND ?${ecmsWhere}
-        GROUP BY DATE(entrydate) ORDER BY d ASC`,
+        WHERE entrydate BETWEEN ? AND ?${ecmsWhere}
+        GROUP BY entrydate ORDER BY d ASC`,
         [trendStart, date, ...ecmsParams]).catch(() => []),
 
       // ── QC: summary ─────────────────────────────────────────────────────────
       query(`SELECT COUNT(*) AS total, SUM(no_of_mistake) AS mistakes
-        FROM qc_review WHERE DATE(entrydate) = ?${qcWhere}`,
+        FROM qc_review WHERE entrydate = ?${qcWhere}`,
         [date, ...qcParams]).catch(() => [{}]),
 
       // ── QC: by category ─────────────────────────────────────────────────────
       query(`SELECT category, COUNT(*) AS cnt, SUM(no_of_mistake) AS mistakes
-        FROM qc_review WHERE DATE(entrydate) = ?${qcWhere}
+        FROM qc_review WHERE entrydate = ?${qcWhere}
         GROUP BY category ORDER BY mistakes DESC`,
         [date, ...qcParams]).catch(() => []),
 
       // ── QC: by severity ─────────────────────────────────────────────────────
       query(`SELECT severity, COUNT(*) AS cnt
-        FROM qc_review WHERE DATE(entrydate) = ? AND severity != ''${qcWhere}
+        FROM qc_review WHERE entrydate = ? AND severity != ''${qcWhere}
         GROUP BY severity ORDER BY FIELD(severity,'high','medium','low')`,
         [date, ...qcParams]).catch(() => []),
 
       // ── QC: 7-day recent list ───────────────────────────────────────────────
-      query(`SELECT id, DATE(entrydate) AS date, category, severity, state, edition,
+      query(`SELECT id, entrydate AS date, category, severity, state, edition,
                pullout, mistake, no_of_mistake, photo_url
-        FROM qc_review WHERE DATE(entrydate) BETWEEN ? AND ?${qcWhere}
+        FROM qc_review WHERE entrydate BETWEEN ? AND ?${qcWhere}
         ORDER BY entrydate DESC, id DESC LIMIT 60`,
         [trendStart, date, ...qcParams]).catch(() => []),
 
       // ── Visits: summary ─────────────────────────────────────────────────────
       query(`SELECT COUNT(*) AS total,
           SUM(CASE WHEN LATITUDE IS NOT NULL AND LATITUDE != '' THEN 1 ELSE 0 END) AS with_loc
-        FROM visit_report WHERE DATE(visit_date) = ?${visitWhere}`,
+        FROM visit_report WHERE visit_date = ?${visitWhere}`,
         [date, ...visitParams]).catch(() => [{}]),
 
       // ── Visits: by remark ───────────────────────────────────────────────────
       query(`SELECT TRIM(visit_remark) AS remark, COUNT(*) AS cnt
-        FROM visit_report WHERE DATE(visit_date) = ?
+        FROM visit_report WHERE visit_date = ?
           AND visit_remark != '' AND visit_remark != 'Week Off'${visitWhere}
         GROUP BY remark ORDER BY cnt DESC LIMIT 10`,
         [date, ...visitParams]).catch(() => []),
 
       // ── Visits: by transport ────────────────────────────────────────────────
       query(`SELECT transport, COUNT(*) AS cnt
-        FROM visit_report WHERE DATE(visit_date) = ?
+        FROM visit_report WHERE visit_date = ?
           AND transport NOT IN ('-- Transport --','') AND visit_remark != 'Week Off'${visitWhere}
         GROUP BY transport ORDER BY cnt DESC`,
         [date, ...visitParams]).catch(() => []),
@@ -165,7 +165,7 @@ module.exports = async function handler(req, res) {
           TRIM(visit_remark) AS remark,
           transport
         FROM visit_report
-        WHERE DATE(visit_date) = ?
+        WHERE visit_date = ?
           AND LATITUDE  IS NOT NULL AND LATITUDE  != ''
           AND LONGITUDE IS NOT NULL AND LONGITUDE != ''
           AND CAST(LONGITUDE AS DECIMAL(10,7)) BETWEEN 6  AND 38
@@ -190,7 +190,7 @@ module.exports = async function handler(req, res) {
           CAST(v.LATITUDE  AS DECIMAL(10,7)) AS lng
         FROM visit_report v
         JOIN \`user\` u ON v.pan_no = u.pan_no
-        WHERE DATE(v.visit_date) = ?
+        WHERE v.visit_date = ?
           AND (v.visit_remark IS NULL OR v.visit_remark != 'Week Off')
           ${filterState  && filterState  !== 'All' ? 'AND u.State = ?'  : ''}
           ${filterBranch && filterBranch !== 'All' ? 'AND u.Branch = ?' : ''}

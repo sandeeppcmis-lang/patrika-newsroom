@@ -73,9 +73,8 @@ const RELEASES_SQL = (tbl, region) => `
                                                                              AS all_release_times,
     '${region}'                                                              AS region
   FROM \`${tbl}\`
-  WHERE input_file REGEXP '^[0-9]{8}-'
+  WHERE input_file LIKE ?
     AND date_time_pdf IS NOT NULL
-    AND STR_TO_DATE(LEFT(input_file, 8), '%d%m%Y') = ?
   GROUP BY pub_date, code
 `;
 
@@ -89,12 +88,16 @@ module.exports = async function handler(req, res) {
 
   // Default to today's date (YYYY-MM-DD)
   const date = req.query.date || new Date().toISOString().slice(0, 10);
+  // GMG file names start with the publish date as ddmmyyyy → a LIKE prefix uses the
+  // index on input_file instead of scanning (STR_TO_DATE/REGEXP defeated the index).
+  const [pY, pM, pD] = date.split('-');
+  const datePrefix   = `${pD}${pM}${pY}-%`;
 
   try {
     // ── 1. Fetch releases from both GMG tables ─────────────────────────────
     const [rajRows, mpcgRows] = await Promise.all([
-      query(RELEASES_SQL('gmg_raj',  'RAJ'),  [date]).catch(() => []),
-      query(RELEASES_SQL('gmg_mpcg', 'MPCG'), [date]).catch(() => []),
+      query(RELEASES_SQL('gmg_raj',  'RAJ'),  [datePrefix]).catch(() => []),
+      query(RELEASES_SQL('gmg_mpcg', 'MPCG'), [datePrefix]).catch(() => []),
     ]);
 
     const releases = [...rajRows, ...mpcgRows];

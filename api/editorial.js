@@ -256,7 +256,7 @@ module.exports = async function handler(req, res) {
                COUNT(DISTINCT e.Pan_no) AS reporters
              FROM daily_achievment_count_ecms e
              ${filterState || filterBranch ? 'JOIN `user` u ON e.Pan_no = u.pan_no' : ''}
-             WHERE DATE(e.entrydate) = ?
+             WHERE e.entrydate = ?
              ${filterState  ? 'AND u.State = ?'  : ''}
              ${filterBranch ? 'AND u.Branch = ?' : ''}`,
              [yesterday, filterState, filterBranch].filter(Boolean)).catch(() => [{}]),
@@ -285,7 +285,7 @@ module.exports = async function handler(req, res) {
                     SUM(e.Expose_khulasa) AS expose, SUM(e.Impact_Story) AS impact
              FROM daily_achievment_count_ecms e
              JOIN \`user\` u ON e.Pan_no = u.pan_no
-             WHERE DATE(e.entrydate) = DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+             WHERE e.entrydate = DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
              ${filterState  ? 'AND u.State = ?'  : ''}
              ${filterBranch ? 'AND u.Branch = ?' : ''}
              GROUP BY u.pan_no, u.EMPNAME, u.State, u.Branch
@@ -304,7 +304,7 @@ module.exports = async function handler(req, res) {
       query(`SELECT DISTINCT u.Branch AS branch
              FROM visit_report v
              JOIN \`user\` u ON v.pan_no = u.pan_no
-             WHERE DATE(v.visit_date) >= ? AND u.Branch IS NOT NULL AND u.Branch != ''
+             WHERE v.visit_date >= ? AND u.Branch IS NOT NULL AND u.Branch != ''
              ${filterState ? 'AND u.State = ?' : ''}`,
              filterState ? [sevenAgo, filterState] : [sevenAgo]).catch(() => []),
 

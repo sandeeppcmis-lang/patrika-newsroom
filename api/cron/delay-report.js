@@ -34,9 +34,8 @@ const RELEASES_SQL = (tbl, region) => `
                                                                             AS all_release_times,
     '${region}'                                                             AS region
   FROM \`${tbl}\`
-  WHERE input_file REGEXP '^[0-9]{8}-'
+  WHERE input_file LIKE ?
     AND date_time_pdf IS NOT NULL
-    AND STR_TO_DATE(LEFT(input_file, 8), '%d%m%Y') = ?
   GROUP BY pub_date, code
 `;
 
@@ -76,9 +75,13 @@ function yesterday() {
 
 // ── Fetch yesterday's delayed editions grouped by unit/branch ─────────────────
 async function fetchDelayedByBranch(date) {
+  // GMG file names start with the publish date as ddmmyyyy → a LIKE prefix uses the
+  // index on input_file instead of scanning (STR_TO_DATE/REGEXP defeated the index).
+  const [dY, dM, dD] = date.split('-');
+  const datePrefix = `${dD}${dM}${dY}-%`;
   const [rajRows, mpcgRows] = await Promise.all([
-    query(RELEASES_SQL('gmg_raj',  'RAJ'),  [date]).catch(() => []),
-    query(RELEASES_SQL('gmg_mpcg', 'MPCG'), [date]).catch(() => []),
+    query(RELEASES_SQL('gmg_raj',  'RAJ'),  [datePrefix]).catch(() => []),
+    query(RELEASES_SQL('gmg_mpcg', 'MPCG'), [datePrefix]).catch(() => []),
   ]);
   const releases = [...rajRows, ...mpcgRows];
   if (!releases.length) return {};

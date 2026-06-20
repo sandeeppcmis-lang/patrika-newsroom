@@ -70,6 +70,11 @@ module.exports = async function handler(req, res) {
     const todayStr = toIST(Date.now());
     const ydayStr  = toIST(Date.now() - 864e5);
     const trend7Str= toIST(Date.now() - 7 * 864e5);
+    // GMG file names begin with the publish date as ddmmyyyy (e.g. "20062026-…").
+    // Match that prefix with LIKE so the existing index on input_file can range-seek,
+    // instead of STR_TO_DATE/REGEXP on the column (which forced a full table scan).
+    const ddmmyyyy       = s => { const [Y, M, D] = s.split('-'); return D + M + Y; };
+    const todayGmgPrefix = ddmmyyyy(todayStr) + '-%';
 
     // ── WHERE helpers ─────────────────────────────────────────────────────────
     const empWhere    = ["(is_emp_working = 1 OR Status = 'Working' OR Status = 'Active')"];
@@ -122,30 +127,30 @@ module.exports = async function handler(req, res) {
       query(`SELECT SUM(No_Story) AS stories, SUM(No_Photo) AS photos, SUM(No_Words) AS words,
                     COUNT(DISTINCT Pan_no) AS reporters
              FROM daily_achievment_count_ecms
-             WHERE DATE(entrydate) = ?${ecmsExtra}`,
+             WHERE entrydate = ?${ecmsExtra}`,
              [ydayStr, ...ecmsParams]).catch(() => [{}]),
 
       // 4. 7-day story trend
       query(`SELECT DATE_FORMAT(entrydate, '%Y-%m-%d') AS d, SUM(No_Story) AS stories,
                     SUM(No_Photo) AS photos, SUM(Exclusive) AS exclusive
              FROM daily_achievment_count_ecms
-             WHERE DATE(entrydate) BETWEEN ? AND ?${ecmsExtra}
+             WHERE entrydate BETWEEN ? AND ?${ecmsExtra}
              GROUP BY DATE_FORMAT(entrydate, '%Y-%m-%d') ORDER BY d ASC`,
              [trend7Str, ydayStr, ...ecmsParams]).catch(() => []),
 
       // 5. QC mistakes yesterday
       query(`SELECT COUNT(*) AS checks, SUM(no_of_mistake) AS mistakes
-             FROM qc_review WHERE DATE(entrydate) = ?${qcExtra}`,
+             FROM qc_review WHERE entrydate = ?${qcExtra}`,
              [ydayStr, ...qcParams]).catch(() => [{}]),
 
       // 6. QC 7-day trend
       query(`SELECT DATE_FORMAT(entrydate, '%Y-%m-%d') AS d, SUM(no_of_mistake) AS mistakes
-             FROM qc_review WHERE DATE(entrydate) BETWEEN ? AND ?${qcExtra}
+             FROM qc_review WHERE entrydate BETWEEN ? AND ?${qcExtra}
              GROUP BY DATE_FORMAT(entrydate, '%Y-%m-%d') ORDER BY d ASC`,
              [trend7Str, ydayStr, ...qcParams]).catch(() => []),
 
       // 7. Field visits yesterday
-      query(`SELECT COUNT(*) AS cnt FROM visit_report WHERE DATE(visit_date) = ?${visitExtra}`,
+      query(`SELECT COUNT(*) AS cnt FROM visit_report WHERE visit_date = ?${visitExtra}`,
              [ydayStr, ...visitParams]).catch(() => [{ cnt: 0 }]),
 
       // 8. Active legal cases
@@ -165,18 +170,16 @@ module.exports = async function handler(req, res) {
                     MAX(date_time_pdf) AS release_time,
                     GROUP_CONCAT(DISTINCT date_time_pdf ORDER BY date_time_pdf DESC SEPARATOR '|') AS all_release_times
              FROM gmg_raj
-             WHERE input_file REGEXP '^[0-9]{8}-' AND date_time_pdf IS NOT NULL
-               AND STR_TO_DATE(LEFT(input_file,8),'%d%m%Y') = ?
-             GROUP BY code`, [todayStr]).catch(() => []),
+             WHERE input_file LIKE ? AND date_time_pdf IS NOT NULL
+             GROUP BY code`, [todayGmgPrefix]).catch(() => []),
 
       // 12. Today's GMG releases — MP/CG
       query(`SELECT UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file,'-',2),'-',-1)) AS code,
                     MAX(date_time_pdf) AS release_time,
                     GROUP_CONCAT(DISTINCT date_time_pdf ORDER BY date_time_pdf DESC SEPARATOR '|') AS all_release_times
              FROM gmg_mpcg
-             WHERE input_file REGEXP '^[0-9]{8}-' AND date_time_pdf IS NOT NULL
-               AND STR_TO_DATE(LEFT(input_file,8),'%d%m%Y') = ?
-             GROUP BY code`, [todayStr]).catch(() => []),
+             WHERE input_file LIKE ? AND date_time_pdf IS NOT NULL
+             GROUP BY code`, [todayGmgPrefix]).catch(() => []),
     ]);
 
     // ── Compute edition delays ────────────────────────────────────────────────

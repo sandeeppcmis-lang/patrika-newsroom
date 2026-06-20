@@ -16,7 +16,20 @@ const HIDDEN_EDITIONS = ['nt jaipur city', 'nt jaipur dak'];
 const isHidden = name => HIDDEN_EDITIONS.includes((name || '').toLowerCase().trim());
 
 // ── Same release-time query used in production.js & delay-report.js ───────────
-const RELEASES_SQL = (tbl, region) => `
+// GMG file names start with the publish date as ddmmyyyy. One LIKE-prefix per day in
+// [startISO, endISO] lets the index on input_file range-seek instead of scanning.
+function gmgDateFilter(startISO, endISO) {
+  const params = [];
+  const d = new Date(startISO + 'T12:00:00'), end = new Date(endISO + 'T12:00:00');
+  while (d <= end) {
+    const [Y, M, D] = d.toISOString().slice(0, 10).split('-');
+    params.push(`${D}${M}${Y}-%`);
+    d.setDate(d.getDate() + 1);
+  }
+  return { clause: '(' + params.map(() => 'input_file LIKE ?').join(' OR ') + ')', params };
+}
+
+const RELEASES_SQL = (tbl, region, dateClause) => `
   SELECT
     DATE_FORMAT(STR_TO_DATE(LEFT(input_file, 8), '%d%m%Y'), '%Y-%m-%d')  AS pub_date,
     UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(input_file, '-', 2), '-', -1)) AS code,
@@ -25,9 +38,8 @@ const RELEASES_SQL = (tbl, region) => `
                                                                           AS all_release_times,
     '${region}'                                                           AS region
   FROM \`${tbl}\`
-  WHERE input_file REGEXP '^[0-9]{8}-'
+  WHERE ${dateClause}
     AND date_time_pdf IS NOT NULL
-    AND STR_TO_DATE(LEFT(input_file, 8), '%d%m%Y') BETWEEN ? AND ?
   GROUP BY pub_date, code
 `;
 
@@ -75,9 +87,10 @@ module.exports = async function handler(req, res) {
 
   try {
     // ── Fetch releases from both tables ────────────────────────────────────
+    const { clause: dateClause, params: dateParams } = gmgDateFilter(startDate, endDate);
     const [rajRows, mpcgRows] = await Promise.all([
-      query(RELEASES_SQL('gmg_raj',  'RAJ'),  [startDate, endDate]).catch(() => []),
-      query(RELEASES_SQL('gmg_mpcg', 'MPCG'), [startDate, endDate]).catch(() => []),
+      query(RELEASES_SQL('gmg_raj',  'RAJ',  dateClause), dateParams).catch(() => []),
+      query(RELEASES_SQL('gmg_mpcg', 'MPCG', dateClause), dateParams).catch(() => []),
     ]);
     const releases = [...rajRows, ...mpcgRows];
 
