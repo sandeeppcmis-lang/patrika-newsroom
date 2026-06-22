@@ -136,6 +136,9 @@ app.all('/api/field/visits/:id',        h('./api/field/visits'));   // PATCH che
 app.all('/api/field/visits',            h('./api/field/visits'));
 app.use('/uploads/field', express.static(path.join(__dirname, 'uploads', 'field')));
 
+// ── Correspondent ─────────────────────────────────────────────────────────────
+app.all('/api/correspondent',         h('./api/correspondent'));
+
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 app.all('/api/tasks/assignees',       h('./api/tasks/assignees'));   // before /:id
 app.all('/api/tasks/:id',             h('./api/tasks/[id]'));

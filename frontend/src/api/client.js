@@ -52,6 +52,13 @@ export const api = {
   syncUsers:   ()         => request('/users/sync',   { method: 'POST' }),
 
   // ── Feedback ─────────────────────────────────────────────────────────────
+  correspondent: (branch, month) => {
+    const p = new URLSearchParams();
+    if (branch && branch !== 'All') p.set('branch', branch);
+    if (month) p.set('month', month);
+    return request(`/correspondent${p.toString() ? '?' + p.toString() : ''}`);
+  },
+
   listFeedback:   ()         => request('/feedback'),
   createFeedback: (data)     => request('/feedback',       { method: 'POST',   body: JSON.stringify(data) }),
   updateFeedback: (id, data) => request(`/feedback/${id}`, { method: 'PATCH',  body: JSON.stringify(data) }),
