@@ -204,16 +204,30 @@ export const api = {
   },
 
   // ── Task Management ──────────────────────────────────────────────────────────
-  listTasks: (status) => {
-    const p = new URLSearchParams();
-    if (status) p.set('status', status);
+  listTasks: (params = {}) => {
+    const p = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v)));
     const qs = p.toString();
     return request(`/tasks${qs ? '?' + qs : ''}`);
   },
-  createTask: (data) => request('/tasks', { method: 'POST', body: JSON.stringify(data) }),
-  updateTask: (id, data) => request(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  deleteTask: (id)       => request(`/tasks/${id}`, { method: 'DELETE' }),
-  taskAssignees: ()      => request('/tasks/assignees'),
+  createTask:    (data)      => request('/tasks',       { method: 'POST',   body: JSON.stringify(data) }),
+  updateTask:    (id, data)  => request(`/tasks/${id}`, { method: 'PATCH',  body: JSON.stringify(data) }),
+  deleteTask:    (id)        => request(`/tasks/${id}`, { method: 'DELETE' }),
+  taskAssignees: ()          => request('/tasks/assignees'),
+  taskComments:  (task_id)   => request(`/tasks/comments?task_id=${task_id}`),
+  addTaskComment:(data)      => request('/tasks/comments', { method: 'POST', body: JSON.stringify(data) }),
+  taskReport:    (params={}) => {
+    const p = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([,v]) => v)));
+    return request(`/tasks/report${p.toString() ? '?' + p.toString() : ''}`);
+  },
+
+  // ── Task Groups ──────────────────────────────────────────────────────────────
+  listTaskGroups:   ()         => request('/task-groups'),
+  createTaskGroup:  (data)     => request('/task-groups',      { method: 'POST',   body: JSON.stringify(data) }),
+  getTaskGroup:     (id)       => request(`/task-groups/${id}`),
+  updateTaskGroup:  (id, data) => request(`/task-groups/${id}`, { method: 'PATCH',  body: JSON.stringify(data) }),
+  deleteTaskGroup:  (id)       => request(`/task-groups/${id}`, { method: 'DELETE' }),
+  addGroupMembers:  (id, pan_nos) => request(`/task-groups/${id}?action=add_members`, { method: 'POST', body: JSON.stringify({ pan_nos }) }),
+  removeGroupMember:(id, pan_no)  => request(`/task-groups/${id}?action=remove_member`, { method: 'POST', body: JSON.stringify({ pan_no }) }),
 
   /**
    * Send an alert (or any custom message) to Telegram.

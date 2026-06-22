@@ -38,6 +38,10 @@ delayReport.register();
 const weeklyAppreciation = require('./api/cron/weekly-appreciation');
 weeklyAppreciation.register();
 
+// ── Cron: Daily 9 AM IST due-date alerts (3 days before) ─────────────────────
+const dueDateAlerts = require('./api/cron/due-date-alerts');
+dueDateAlerts.register();
+
 // ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -144,8 +148,14 @@ app.post('/api/news-generator',       require('./api/news-generator'));
 // ── Correspondent ─────────────────────────────────────────────────────────────
 app.all('/api/correspondent',         h('./api/correspondent'));
 
+// ── Task Groups ───────────────────────────────────────────────────────────────
+app.all('/api/task-groups/:id',       h('./api/task-groups/[id]'));
+app.all('/api/task-groups',           h('./api/task-groups'));
+
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 app.all('/api/tasks/assignees',       h('./api/tasks/assignees'));   // before /:id
+app.all('/api/tasks/comments',        h('./api/tasks/comments'));
+app.all('/api/tasks/report',          h('./api/tasks/report'));
 app.all('/api/tasks/:id',             h('./api/tasks/[id]'));
 app.all('/api/tasks',                 h('./api/tasks'));
 
