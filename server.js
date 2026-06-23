@@ -38,6 +38,10 @@ delayReport.register();
 const weeklyAppreciation = require('./api/cron/weekly-appreciation');
 weeklyAppreciation.register();
 
+// ── Cron: Daily 9 AM IST due-date alerts (3 days before) ─────────────────────
+const dueDateAlerts = require('./api/cron/due-date-alerts');
+dueDateAlerts.register();
+
 // ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -56,6 +60,8 @@ function h(handlerPath) {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 app.all('/api/auth/login',            h('./api/auth/login'));
+app.all('/api/auth/login-logs',       h('./api/auth/login-logs'));
+app.all('/api/auth/activity-logs',    h('./api/auth/activity-logs'));
 app.all('/api/auth/whoami',           h('./api/auth/whoami'));
 app.all('/api/auth/setup',            h('./api/auth/setup'));   // delete after first login
 
@@ -136,8 +142,20 @@ app.all('/api/field/visits/:id',        h('./api/field/visits'));   // PATCH che
 app.all('/api/field/visits',            h('./api/field/visits'));
 app.use('/uploads/field', express.static(path.join(__dirname, 'uploads', 'field')));
 
+// ── News Generator ────────────────────────────────────────────────────────────
+app.post('/api/news-generator',       require('./api/news-generator'));
+
+// ── Correspondent ─────────────────────────────────────────────────────────────
+app.all('/api/correspondent',         h('./api/correspondent'));
+
+// ── Task Groups ───────────────────────────────────────────────────────────────
+app.all('/api/task-groups/:id',       h('./api/task-groups/[id]'));
+app.all('/api/task-groups',           h('./api/task-groups'));
+
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 app.all('/api/tasks/assignees',       h('./api/tasks/assignees'));   // before /:id
+app.all('/api/tasks/comments',        h('./api/tasks/comments'));
+app.all('/api/tasks/report',          h('./api/tasks/report'));
 app.all('/api/tasks/:id',             h('./api/tasks/[id]'));
 app.all('/api/tasks',                 h('./api/tasks'));
 
