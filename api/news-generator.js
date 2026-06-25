@@ -9,7 +9,7 @@
 const multer  = require('multer');
 const path    = require('path');
 const fetch   = require('node-fetch');
-const { requireRole }            = require('./_lib/auth');
+const { getUser }                = require('./_lib/auth');
 const { setCors, handleOptions } = require('./_lib/cors');
 
 const upload = multer({
@@ -68,25 +68,30 @@ async function extractText(buffer, mimetype, originalname) {
   return buffer.toString('utf8').trim();
 }
 
-// ── Gemini call ───────────────────────────────────────────────────────────────
-async function callGemini(systemPrompt, userContent) {
-  const key = process.env.GEMINI_API_KEY;
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=${key}`;
-  const res = await fetch(url, {
+// ── Groq call ─────────────────────────────────────────────────────────────────
+async function callGroq(systemPrompt, userContent) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      Authorization:  `Bearer ${process.env.GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: 'user', parts: [{ text: userContent }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 1500 },
+      model:       'llama-3.1-8b-instant',
+      messages:    [
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: userContent  },
+      ],
+      temperature: 0.4,
+      max_tokens:  1500,
     }),
   });
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini error ${res.status}: ${err}`);
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Groq error ${res.status}: ${err.error?.message || JSON.stringify(err)}`);
   }
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  return data.choices?.[0]?.message?.content?.trim() || '';
 }
 
 // ── Parse structured JSON from LLM response ───────────────────────────────────
@@ -102,11 +107,11 @@ module.exports = function handler(req, res) {
   if (handleOptions(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { authError, user } = requireRole(req, ['Admin', 'State Head', 'Regional Editor']);
-  if (authError) return res.status(authError.status).json({ error: authError.message });
+  const user = getUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(503).json({ error: 'GEMINI_API_KEY is not configured. Please add it to .env' });
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(503).json({ error: 'GROQ_API_KEY is not configured. Please add it to .env' });
   }
 
   upload(req, res, async (err) => {
@@ -159,7 +164,7 @@ JSON format:
 `.trim();
 
     try {
-      const raw    = await callGemini(systemPrompt, `स्रोत सामग्री:\n\n${input}`);
+      const raw    = await callGroq(systemPrompt, `स्रोत सामग्री:\n\n${input}`);
       const parsed = parseJSON(raw);
 
       return res.json({

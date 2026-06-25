@@ -157,7 +157,7 @@ async function computeFast(sF, bF) {
   };
 
   let briefing = null;
-  if (process.env.OPENAI_API_KEY && briefingStats.stories > 0) {
+  if (process.env.GROQ_API_KEY && briefingStats.stories > 0) {
     try {
       const fetch  = require('node-fetch');
       const prompt = [
@@ -173,14 +173,17 @@ async function computeFast(sF, bF) {
         'Keep it professional, factual, and actionable for editors. Avoid bullet points.',
       ].filter(Boolean).join('\n');
 
-      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method:  'POST',
-        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 280 }),
+        headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: prompt }], max_tokens: 280, temperature: 0.7 }),
       });
       if (r.ok) {
         const d = await r.json();
         briefing = d.choices?.[0]?.message?.content?.trim() || null;
+      } else {
+        const err = await r.json().catch(() => ({}));
+        console.error('[ai/insights] Groq briefing error:', err.error?.message || r.status);
       }
     } catch (e) { console.error('[ai/insights] briefing:', e.message); }
   }

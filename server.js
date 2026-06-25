@@ -148,6 +148,10 @@ app.post('/api/news-generator',       require('./api/news-generator'));
 // ── Correspondent ─────────────────────────────────────────────────────────────
 app.all('/api/correspondent',         h('./api/correspondent'));
 
+// ── Task Bank ─────────────────────────────────────────────────────────────────
+app.all('/api/task-bank/:id',         h('./api/task-bank/[id]'));
+app.all('/api/task-bank',             h('./api/task-bank'));
+
 // ── Task Groups ───────────────────────────────────────────────────────────────
 app.all('/api/task-groups/:id',       h('./api/task-groups/[id]'));
 app.all('/api/task-groups',           h('./api/task-groups'));

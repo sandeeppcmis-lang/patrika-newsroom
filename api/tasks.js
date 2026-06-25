@@ -31,6 +31,8 @@ async function ensureTable() {
       completed_at         DATETIME,
       assigned_by_telegram VARCHAR(100) DEFAULT NULL,
       group_id             INT          DEFAULT NULL,
+      telegram_sent        TINYINT      DEFAULT 0,
+      telegram_sent_at     DATETIME     DEFAULT NULL,
       INDEX idx_state  (assigned_to_state),
       INDEX idx_branch (assigned_to_branch),
       INDEX idx_status (status),
@@ -41,13 +43,14 @@ async function ensureTable() {
 }
 
 async function sendTaskTelegram(assigneeChatId, { title, category, priority, due_date, creatorName, description }) {
-  if (!assigneeChatId) return;
+  if (!assigneeChatId) return false;
   const prioEmoji = priority === 'high' ? '🔴' : priority === 'low' ? '🟢' : '🟡';
   const prioLabel = priority === 'high' ? 'High' : priority === 'low' ? 'Low' : 'Medium';
   const dueLine   = due_date ? `\n📅 <b>Due:</b> ${due_date}` : '';
   const descLine  = description ? `\n\n${description}` : '';
   const msg = `📋 <b>New Task Assigned</b>\n\n<b>${title}</b>\n🏷 ${category || 'Other'}  ·  ${prioEmoji} ${prioLabel}${dueLine}\n👤 From: ${creatorName}${descLine}`;
-  return sendMessage(assigneeChatId, msg).catch(e => console.error('[tasks] Telegram FAILED:', e.message));
+  await sendMessage(assigneeChatId, msg);
+  return true;
 }
 
 module.exports = async function handler(req, res) {
@@ -61,7 +64,9 @@ module.exports = async function handler(req, res) {
     try {
       await ensureTable();
       await ensureColumn('tasks', 'assigned_by_telegram', "VARCHAR(100) DEFAULT NULL");
-      await ensureColumn('tasks', 'group_id', "INT DEFAULT NULL");
+      await ensureColumn('tasks', 'group_id',             "INT DEFAULT NULL");
+      await ensureColumn('tasks', 'telegram_sent',        "TINYINT DEFAULT 0");
+      await ensureColumn('tasks', 'telegram_sent_at',     "DATETIME DEFAULT NULL");
       tableReady = true;
     } catch (e) { return res.status(500).json({ error: 'DB setup: ' + e.message }); }
   }
@@ -100,17 +105,12 @@ module.exports = async function handler(req, res) {
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const {
-      // shared fields
       category, priority, due_date,
-      // single-task fields
       title, description,
-      // bulk: array of {title, description}
       tasks: bulkTasks,
-      // assignment: individual pan or group
       assigned_to_pan, assigned_to_group,
     } = body;
 
-    // Build task list (single or bulk)
     const taskList = bulkTasks?.length
       ? bulkTasks.filter(t => t?.title?.trim())
       : title?.trim() ? [{ title: title.trim(), description: description || '' }] : [];
@@ -119,7 +119,7 @@ module.exports = async function handler(req, res) {
     if (!assigned_to_pan && !assigned_to_group)
       return res.status(400).json({ error: 'Select an assignee (individual or group)' });
 
-    // Get creator info
+    // Creator info
     const [creator] = await query(
       'SELECT name FROM users WHERE username = ? LIMIT 1', [user.sub]
     ).catch(() => []);
@@ -134,28 +134,19 @@ module.exports = async function handler(req, res) {
 
     // Resolve assignee list
     let assignees = [];
-
     if (assigned_to_group) {
-      // Load group members
       const members = await query(
         `SELECT m.pan_no, m.emp_name AS EMPNAME, m.state AS State, m.branch AS Branch, m.telegram_chat_id
          FROM task_group_members m WHERE m.group_id = ?`, [assigned_to_group]
       ).catch(() => []);
-      if (!members.length)
-        return res.status(400).json({ error: 'Group has no members' });
+      if (!members.length) return res.status(400).json({ error: 'Group has no members' });
 
-      // State Head: filter to their state
       assignees = members.filter(m => {
         if (user.role === 'State Head' && user.state && m.State !== user.state) return false;
         return true;
-      }).map(m => ({
-        pan_no: m.pan_no, EMPNAME: m.EMPNAME,
-        State: m.State, Branch: m.Branch,
-        telegram_chat_id: m.telegram_chat_id,
-      }));
+      }).map(m => ({ pan_no: m.pan_no, EMPNAME: m.EMPNAME, State: m.State, Branch: m.Branch, telegram_chat_id: m.telegram_chat_id }));
 
-      if (!assignees.length)
-        return res.status(400).json({ error: 'No group members in your state' });
+      if (!assignees.length) return res.status(400).json({ error: 'No group members in your state' });
     } else {
       const [assignee] = await query(
         `SELECT pan_no, EMPNAME, State, Branch, telegram_chat_id FROM \`user\` WHERE pan_no = ?`,
@@ -167,7 +158,7 @@ module.exports = async function handler(req, res) {
       assignees = [assignee];
     }
 
-    // Batch INSERT all tasks first, then send Telegram non-blocking
+    // INSERT all tasks
     const created = [];
     const telegramQueue = [];
 
@@ -177,8 +168,9 @@ module.exports = async function handler(req, res) {
           `INSERT INTO tasks
              (title, description, category, priority,
               assigned_to_pan, assigned_to_name, assigned_to_state, assigned_to_branch,
-              assigned_by, assigned_by_name, due_date, assigned_by_telegram, group_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              assigned_by, assigned_by_name, due_date, assigned_by_telegram, group_id,
+              telegram_sent)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
           [
             task.title.trim(), task.description || '', category || 'Other', priority || 'medium',
             assignee.pan_no, assignee.EMPNAME || '', assignee.State || '', assignee.Branch || '',
@@ -186,23 +178,31 @@ module.exports = async function handler(req, res) {
             assigned_to_group || null,
           ]
         );
-        created.push(result.insertId);
+        const taskId = result.insertId;
+        created.push(taskId);
 
         if (assignee.telegram_chat_id) {
-          telegramQueue.push({ chatId: assignee.telegram_chat_id, task, assignee });
+          telegramQueue.push({ chatId: assignee.telegram_chat_id, taskId, task });
         }
       }
     }
 
-    // Respond immediately — send Telegram in background
+    // Respond immediately
     res.status(201).json({ ok: true, ids: created, count: created.length });
 
-    // Fire-and-forget Telegram notifications
-    for (const { chatId, task } of telegramQueue) {
+    // Send Telegram in background and update telegram_sent per task
+    for (const { chatId, taskId, task } of telegramQueue) {
       sendTaskTelegram(chatId, {
         title: task.title.trim(), category, priority, due_date, creatorName,
         description: task.description,
-      }).catch(e => console.error('[tasks] Telegram failed:', e.message));
+      }).then(sent => {
+        if (sent) {
+          query('UPDATE tasks SET telegram_sent = 1, telegram_sent_at = NOW() WHERE id = ?', [taskId])
+            .catch(e => console.error('[tasks] telegram_sent update failed:', e.message));
+        }
+      }).catch(e => {
+        console.error('[tasks] Telegram failed for task', taskId, ':', e.message);
+      });
     }
     return;
   }

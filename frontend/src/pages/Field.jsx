@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.jsx';
-import { api } from '../api/client.js';
+import { api, API_BASE } from '../api/client.js';
 import {
   MapPin, Navigation, Send, RefreshCw, Clock,
   ChevronDown, ChevronUp, Loader2, AlertTriangle,
   CheckCircle2, AlertCircle, ExternalLink, Camera,
+  Sparkles, Copy, Check, RotateCcw, Newspaper, Upload, FileText, Image, File,
 } from 'lucide-react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -197,7 +198,7 @@ export default function Field() {
           <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl shrink-0">📡</div>
           <div>
             <h1 className="text-2xl font-bold">फील्ड रिपोर्टिंग</h1>
-            <p className="text-emerald-100 text-sm mt-0.5">स्टोरी सबमिट करें · फील्ड विजिट दर्ज करें</p>
+            <p className="text-emerald-100 text-sm mt-0.5">स्टोरी सबमिट करें · फील्ड विजिट · न्यूज़ जनरेटर</p>
           </div>
         </div>
         {user?.name && (
@@ -213,15 +214,16 @@ export default function Field() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-2 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div className="flex gap-1 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm border border-gray-100 dark:border-gray-700">
         {[
           { key: 'story', label: 'स्टोरी सबमिशन', emoji: '📰' },
           { key: 'visit', label: 'फील्ड विजिट',    emoji: '📍' },
+          { key: 'news',  label: 'न्यूज़ जनरेटर',   emoji: '✨' },
         ].map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg text-xs font-medium transition-all
               ${tab === t.key ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           >
             <span>{t.emoji}</span> {t.label}
@@ -231,6 +233,7 @@ export default function Field() {
 
       {tab === 'story' && <StoryTab user={user} />}
       {tab === 'visit' && <VisitTab user={user} />}
+      {tab === 'news'  && <NewsGeneratorTab />}
     </div>
   );
 }
@@ -1041,6 +1044,247 @@ function VisitTab({ user }) {
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── News Generator Tab ────────────────────────────────────────────────────────
+const LENGTH_OPTS = [
+  { value: 'short',    label: 'छोटी',    desc: '100–150 शब्द' },
+  { value: 'medium',   label: 'मध्यम',   desc: '150–200 शब्द' },
+  { value: 'detailed', label: 'विस्तृत', desc: '200–250 शब्द' },
+];
+const ACCEPT_FILES = '.pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.webp,.bmp';
+
+function fileTypeIcon(name = '') {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (['jpg','jpeg','png','webp','bmp'].includes(ext)) return <Image size={18} />;
+  if (ext === 'pdf') return <FileText size={18} />;
+  return <File size={18} />;
+}
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      title="कॉपी करें"
+    >
+      {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} className="text-gray-400" />}
+    </button>
+  );
+}
+
+function OutputField({ label, value, multiline }) {
+  if (!value) return null;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</label>
+        <CopyButton text={value} />
+      </div>
+      {multiline
+        ? <div className="rounded-xl border border-gray-200 dark:border-gray-600 p-3 text-sm leading-relaxed whitespace-pre-wrap bg-gray-50 dark:bg-gray-700/40 text-gray-800 dark:text-gray-100" style={{ fontFamily: '"Noto Sans Devanagari", sans-serif' }}>{value}</div>
+        : <div className="rounded-xl border border-gray-200 dark:border-gray-600 px-3 py-2.5 text-sm font-semibold bg-gray-50 dark:bg-gray-700/40 text-gray-800 dark:text-gray-100" style={{ fontFamily: '"Noto Sans Devanagari", sans-serif' }}>{value}</div>
+      }
+    </div>
+  );
+}
+
+function NewsGeneratorTab() {
+  const [file,         setFile]         = useState(null);
+  const [length,       setLength]       = useState('short');
+  const [city,         setCity]         = useState('');
+  const [valueEdition, setValueEdition] = useState(false);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState('');
+  const [result,       setResult]       = useState(null);
+  const fileRef = useRef();
+
+  function pickFile(f) { if (f) { setFile(f); setResult(null); setError(''); } }
+
+  async function generate() {
+    if (!file) { setError('कृपया पहले एक फ़ाइल चुनें।'); return; }
+    setLoading(true); setError(''); setResult(null);
+    const fd = new FormData();
+    fd.append('file',          file);
+    fd.append('length',        length);
+    fd.append('city',          city.trim());
+    fd.append('value_edition', valueEdition ? '1' : '0');
+    try {
+      const token = localStorage.getItem('pk_token');
+      const res   = await fetch(`${API_BASE}/news-generator`, {
+        method:  'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body:    fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'जनरेशन फेल हो गई');
+      setResult(data);
+    } catch (e) { setError(e.message); }
+    finally     { setLoading(false); }
+  }
+
+  function copyAll() {
+    if (!result) return;
+    const parts = [`शीर्षक: ${result.headline}`, `उप-शीर्षक: ${result.sub_headline}`, `\n${result.text}`];
+    if (result.ve_headline) parts.push(`\nValue Edition शीर्षक: ${result.ve_headline}`);
+    if (result.ve_text)     parts.push(result.ve_text);
+    navigator.clipboard.writeText(parts.join('\n'));
+  }
+
+  return (
+    <div className="space-y-4">
+
+      {/* ── Upload card ── */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+          <Newspaper size={18} className="text-purple-600 dark:text-purple-400" />
+          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">न्यूज़ जनरेटर</h2>
+          <span className="text-xs text-gray-400 ml-1">— फ़ाइल अपलोड करें, हिंदी समाचार पाएं</span>
+        </div>
+
+        <div className="p-5 space-y-5">
+
+          {/* Drop zone */}
+          <div
+            onClick={() => !file && fileRef.current?.click()}
+            className={`rounded-2xl border-2 border-dashed transition-colors ${file ? 'p-4' : 'p-8 cursor-pointer hover:border-purple-400 hover:bg-purple-50/30 dark:hover:bg-purple-900/10'} border-gray-200 dark:border-gray-600`}
+          >
+            {file ? (
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg p-2 bg-purple-600 text-white shrink-0">{fileTypeIcon(file.name)}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{file.name}</p>
+                  <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(0)} KB</p>
+                </div>
+                <button
+                  onClick={e => { e.stopPropagation(); setFile(null); setResult(null); setError(''); }}
+                  className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 dark:border-gray-600 px-2.5 py-1 rounded-lg transition-colors"
+                >हटाएं</button>
+              </div>
+            ) : (
+              <div className="text-center space-y-2">
+                <Upload size={28} className="mx-auto text-gray-300" />
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">फ़ाइल यहाँ छोड़ें या क्लिक करें</p>
+                <p className="text-xs text-gray-400">PDF, DOCX, DOC, TXT, JPG, PNG — अधिकतम 20 MB</p>
+              </div>
+            )}
+          </div>
+          <input ref={fileRef} type="file" accept={ACCEPT_FILES} className="hidden"
+            onChange={e => pickFile(e.target.files[0])} capture="environment" />
+
+          {/* Length selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">समाचार की लंबाई</label>
+            <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600">
+              {LENGTH_OPTS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setLength(opt.value)}
+                  className="flex-1 py-2.5 text-xs font-semibold transition-all"
+                  style={{
+                    background: length === opt.value ? '#7c3aed' : 'transparent',
+                    color:      length === opt.value ? '#fff' : undefined,
+                  }}
+                >
+                  {opt.label}
+                  <span className="block text-[10px] opacity-70 mt-0.5">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* City + Value Edition row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">शहर (byline के लिए)</label>
+              <input
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                placeholder="जैसे: जयपुर"
+                value={city}
+                onChange={e => setCity(e.target.value)}
+                style={{ fontFamily: '"Noto Sans Devanagari", sans-serif' }}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Byline: <span className="font-mono">{city.trim() ? `${city.trim()}@पत्रिका` : '@पत्रिका'}</span>
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Value Edition</label>
+              <button
+                onClick={() => setValueEdition(v => !v)}
+                className={`w-full rounded-xl border-2 flex items-center gap-3 px-3 py-2.5 transition-all ${valueEdition ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-gray-600'}`}
+              >
+                <div className={`w-9 h-5 rounded-full flex items-center transition-all ${valueEdition ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'}`} style={{ padding: '2px' }}>
+                  <div className="w-4 h-4 bg-white rounded-full shadow transition-all" style={{ transform: valueEdition ? 'translateX(16px)' : 'translateX(0)' }} />
+                </div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{valueEdition ? 'चालू' : 'बंद'}</span>
+              </button>
+              <p className="text-xs text-gray-400 mt-1">55–65 शब्दों का संक्षिप्त संस्करण</p>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-start gap-2 rounded-xl px-4 py-3 text-sm bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 border border-red-200 dark:border-red-800">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" /> {error}
+            </div>
+          )}
+
+          {/* Generate button */}
+          <button
+            onClick={generate}
+            disabled={!file || loading}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white font-bold rounded-xl text-base transition-colors shadow-sm"
+          >
+            {loading
+              ? <><Loader2 size={18} className="animate-spin" /> जनरेट हो रहा है…</>
+              : <><Sparkles size={18} /> हिंदी समाचार जनरेट करें</>
+            }
+          </button>
+        </div>
+      </div>
+
+      {/* ── Result ── */}
+      {result && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+            <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-500" /> समाचार तैयार है
+            </h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={copyAll}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600"
+              >
+                <Copy size={13} /> सब कॉपी करें
+              </button>
+              <button
+                onClick={() => { setResult(null); setFile(null); setError(''); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600"
+              >
+                <RotateCcw size={13} /> नया
+              </button>
+            </div>
+          </div>
+          <div className="p-5 space-y-4">
+            <OutputField label="शीर्षक (Headline)"        value={result.headline} />
+            <OutputField label="उप-शीर्षक (Sub-Headline)"  value={result.sub_headline} />
+            <OutputField label="समाचार पाठ (News Text)"    value={result.text} multiline />
+            {(result.ve_headline || result.ve_text) && (
+              <>
+                <hr className="border-gray-100 dark:border-gray-700" />
+                <p className="text-xs font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400">Value Edition</p>
+                <OutputField label="Value Edition शीर्षक" value={result.ve_headline} />
+                <OutputField label="Value Edition पाठ"    value={result.ve_text} multiline />
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

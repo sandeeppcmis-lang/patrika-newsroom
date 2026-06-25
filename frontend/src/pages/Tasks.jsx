@@ -51,6 +51,23 @@ function StatusBadge({ s }) {
 }
 
 // ── Assign-to selector (shared between single & bulk modals) ─────────────────
+function TelegramBadge({ sent, sentAt }) {
+  const title = sent
+    ? `Telegram alert sent${sentAt ? ' at ' + String(sentAt).slice(0, 16).replace('T', ' ') : ''}`
+    : 'Telegram alert not sent (no Telegram registered)';
+  return (
+    <span title={title} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      fontSize: 11, padding: '2px 7px', borderRadius: 9999, fontWeight: 600,
+      background: sent ? '#f0fdf4' : '#f3f4f6',
+      color:      sent ? '#16a34a' : '#9ca3af',
+      border: `1px solid ${sent ? '#bbf7d0' : '#e5e7eb'}`,
+    }}>
+      📱 {sent ? 'Sent' : 'Not sent'}
+    </span>
+  );
+}
+
 function AssignSelector({ assignees, groups, value, groupValue, mode, onMode, onPan, onGroup }) {
   const [search, setSearch] = useState('');
   const filtered = search.trim()
@@ -122,8 +139,9 @@ function AssignSelector({ assignees, groups, value, groupValue, mode, onMode, on
 
 // ── Create Task Modal (supports bulk + group) ─────────────────────────────────
 function CreateModal({ user, onClose, onDone }) {
-  const [assignees, setAssignees] = useState([]);
-  const [groups,    setGroups]    = useState([]);
+  const [assignees,    setAssignees]    = useState([]);
+  const [groups,       setGroups]       = useState([]);
+  const [showBankPicker, setShowBankPicker] = useState(false);
   const [mode,      setMode]      = useState('individual'); // individual | group
   const [pan,       setPan]       = useState('');
   const [group,     setGroup]     = useState('');
@@ -178,10 +196,16 @@ function CreateModal({ user, onClose, onDone }) {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Tasks *</label>
-              <button type="button" onClick={addTask}
-                style={{ fontSize: 11, color: 'var(--brand)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
-                <Plus size={12} /> Add Another Task
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" onClick={() => setShowBankPicker(true)}
+                  style={{ fontSize: 11, color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                  <Star size={11} /> From Task Bank
+                </button>
+                <button type="button" onClick={addTask}
+                  style={{ fontSize: 11, color: 'var(--brand)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Plus size={12} /> Add Another
+                </button>
+              </div>
             </div>
             {tasks.map((t, i) => (
               <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
@@ -249,6 +273,23 @@ function CreateModal({ user, onClose, onDone }) {
           </div>
         </div>
       </div>
+
+      {showBankPicker && (
+        <TaskBankPicker
+          onClose={() => setShowBankPicker(false)}
+          onSelect={t => {
+            setTasks(ts => {
+              const empty = ts.findIndex(x => !x.title.trim());
+              if (empty !== -1) {
+                return ts.map((x, i) => i === empty ? { title: t.title, description: t.description || '' } : x);
+              }
+              return [...ts, { title: t.title, description: t.description || '' }];
+            });
+            setShared(s => ({ ...s, category: t.category || s.category, priority: t.priority || s.priority }));
+            setShowBankPicker(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -384,6 +425,7 @@ function TaskCard({ task, canEdit, onRefresh }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
           <PriorityBadge p={task.priority} />
           <StatusBadge   s={task.status}   />
+          <TelegramBadge sent={task.telegram_sent} sentAt={task.telegram_sent_at} hasTelegram={!!task.assigned_to_pan} />
           {open ? <ChevronUp size={15} style={{ color: 'var(--muted)' }} /> : <ChevronDown size={15} style={{ color: 'var(--muted)' }} />}
         </div>
       </div>
@@ -752,6 +794,229 @@ function ReportTab() {
   );
 }
 
+// ── Task Bank Tab ─────────────────────────────────────────────────────────────
+function TaskBankTab({ canEdit }) {
+  const [templates, setTemplates] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [search,    setSearch]    = useState('');
+  const [catFilter, setCatFilter] = useState('all');
+  const [showForm,  setShowForm]  = useState(false);
+  const [editing,   setEditing]   = useState(null);
+
+  const load = () => {
+    setLoading(true);
+    api.listTaskBank().then(r => { setTemplates(r.templates || []); setLoading(false); }).catch(() => setLoading(false));
+  };
+  useEffect(load, []); // eslint-disable-line
+
+  const deleteItem = async (t) => {
+    if (!confirm(`Delete template "${t.title}"?`)) return;
+    await api.deleteTaskBankItem(t.id).catch(e => alert(e.message));
+    load();
+  };
+
+  const cats = ['all', ...Array.from(new Set(templates.map(t => t.category))).sort()];
+  const filtered = templates.filter(t => {
+    if (catFilter !== 'all' && t.category !== catFilter) return false;
+    if (search && !t.title.toLowerCase().includes(search.toLowerCase()) &&
+        !(t.description || '').toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  return (
+    <div>
+      <SectionCard
+        title={`Task Bank (${templates.length} templates)`}
+        action={canEdit && (
+          <button className="btn-primary flex items-center gap-1 text-sm px-3 py-1"
+            onClick={() => { setEditing(null); setShowForm(true); }}>
+            <Plus size={13} /> New Template
+          </button>
+        )}
+      >
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          <input className="input" placeholder="Search templates…" value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, minWidth: 180, fontSize: 12 }} />
+          <select className="input" value={catFilter} onChange={e => setCatFilter(e.target.value)}
+            style={{ fontSize: 12 }}>
+            {cats.map(c => <option key={c} value={c}>{c === 'all' ? 'All Categories' : c}</option>)}
+          </select>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>Loading…</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Star size={36} style={{ color: 'var(--muted)', margin: '0 auto 12px' }} />
+            <p style={{ fontSize: 14, color: 'var(--muted)' }}>
+              {templates.length === 0 ? 'No templates yet. Create your first task template.' : 'No templates match your search.'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+            {filtered.map(t => (
+              <div key={t.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', background: 'var(--bg)', borderLeft: `3px solid ${PRIORITY[t.priority]?.dot || '#6b7280'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>{t.title}</span>
+                  {canEdit && (
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
+                      <button onClick={() => { setEditing(t); setShowForm(true); }}
+                        style={{ color: 'var(--muted)', cursor: 'pointer', padding: 2 }}><Edit2 size={13} /></button>
+                      <button onClick={() => deleteItem(t)}
+                        style={{ color: '#ef4444', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
+                    </div>
+                  )}
+                </div>
+                {t.description && (
+                  <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.5,
+                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {t.description}
+                  </p>
+                )}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--surface)', padding: '2px 7px', borderRadius: 9999, border: '1px solid var(--border)' }}>
+                    {t.category}
+                  </span>
+                  <PriorityBadge p={t.priority} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+
+      {showForm && (
+        <TaskBankForm
+          initial={editing}
+          onClose={() => { setShowForm(false); setEditing(null); }}
+          onDone={() => { setShowForm(false); setEditing(null); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function TaskBankForm({ initial, onClose, onDone }) {
+  const [form, setForm] = useState({
+    title:       initial?.title       || '',
+    description: initial?.description || '',
+    category:    initial?.category    || 'Story Assignment',
+    priority:    initial?.priority    || 'medium',
+  });
+  const [saving, setSaving] = useState(false);
+  const [err,    setErr]    = useState('');
+
+  const submit = async () => {
+    if (!form.title.trim()) return setErr('Title is required');
+    setSaving(true);
+    try {
+      if (initial) { await api.updateTaskBankItem(initial.id, form); }
+      else         { await api.createTaskBankItem(form); }
+      onDone();
+    } catch (e) { setErr(e.message); setSaving(false); }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 22, width: '100%', maxWidth: 460 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h3 style={{ fontWeight: 700, fontSize: 15 }}>{initial ? 'Edit Template' : 'New Task Template'}</h3>
+          <button onClick={onClose}><X size={18} /></button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Title *</label>
+            <input className="input" placeholder="e.g. Front Page Story Assignment"
+              value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Description</label>
+            <textarea className="input" rows={3} placeholder="Default task description / instructions…"
+              value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              style={{ resize: 'vertical' }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Category</label>
+              <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Default Priority</label>
+              <select className="input" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                <option value="high">🔴 High</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="low">🟢 Low</option>
+              </select>
+            </div>
+          </div>
+          {err && <p style={{ color: '#ef4444', fontSize: 12 }}>{err}</p>}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn-primary" onClick={submit} disabled={saving}>
+              {saving ? 'Saving…' : initial ? 'Save Changes' : 'Create Template'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Task Bank Picker (used inside Create modal) ────────────────────────────────
+function TaskBankPicker({ onSelect, onClose }) {
+  const [templates, setTemplates] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [search,    setSearch]    = useState('');
+  const [catFilter, setCatFilter] = useState('all');
+
+  useEffect(() => {
+    api.listTaskBank().then(r => { setTemplates(r.templates || []); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  const cats = ['all', ...Array.from(new Set(templates.map(t => t.category))).sort()];
+  const filtered = templates.filter(t => {
+    if (catFilter !== 'all' && t.category !== catFilter) return false;
+    if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: 'var(--surface)', borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <h3 style={{ fontWeight: 700, fontSize: 15 }}>Pick from Task Bank</h3>
+          <button onClick={onClose}><X size={18} /></button>
+        </div>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8 }}>
+          <input className="input" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, fontSize: 12 }} />
+          <select className="input" value={catFilter} onChange={e => setCatFilter(e.target.value)} style={{ fontSize: 12 }}>
+            {cats.map(c => <option key={c} value={c}>{c === 'all' ? 'All' : c}</option>)}
+          </select>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1, padding: '10px 20px 16px' }}>
+          {loading ? <p style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>Loading…</p> :
+           filtered.length === 0 ? <p style={{ textAlign: 'center', padding: 30, color: 'var(--muted)', fontSize: 13 }}>No templates found.</p> :
+           filtered.map(t => (
+            <button key={t.id} onClick={() => onSelect(t)}
+              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', marginBottom: 6, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', cursor: 'pointer', borderLeft: `3px solid ${PRIORITY[t.priority]?.dot || '#6b7280'}` }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{t.title}</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>{t.category}</span>
+                <PriorityBadge p={t.priority} />
+              </div>
+              {t.description && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.description}</p>}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Tasks() {
   const { user } = useApp();
@@ -780,9 +1045,10 @@ export default function Tasks() {
   const counts = tasks.reduce((acc, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc; }, {});
 
   const TABS = [
-    { key: 'tasks',  label: 'Tasks',          Icon: ClipboardList },
-    { key: 'groups', label: 'Groups',         Icon: Users },
-    { key: 'report', label: 'Report & Grading', Icon: BarChart2 },
+    { key: 'tasks',    label: 'Tasks',            Icon: ClipboardList },
+    { key: 'groups',   label: 'Groups',            Icon: Users },
+    { key: 'bank',     label: 'Task Bank',         Icon: Star },
+    { key: 'report',   label: 'Report & Grading',  Icon: BarChart2 },
   ];
 
   return (
@@ -867,6 +1133,7 @@ export default function Tasks() {
       )}
 
       {activeTab === 'groups' && <GroupsTab canEdit={canCreate} />}
+      {activeTab === 'bank'   && <TaskBankTab canEdit={canCreate} />}
       {activeTab === 'report' && <ReportTab />}
     </div>
   );

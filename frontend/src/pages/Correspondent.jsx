@@ -144,14 +144,14 @@ export default function Correspondent() {
       {/* ── Branch chart ── */}
       {showChart && branchSummary.length > 0 && (
         <div className="card p-4">
-          <h2 className="text-sm font-semibold mb-3">Words by Branch</h2>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={branchSummary} margin={{ top: 0, right: 10, left: 0, bottom: 40 }}>
+          <h2 className="text-sm font-semibold mb-3">Payment by Branch (₹)</h2>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={[...branchSummary].sort((a, b) => b.amount - a.amount)} margin={{ top: 4, right: 10, left: 10, bottom: 50 }}>
               <XAxis dataKey="branch" tick={{ fontSize: 10 }} angle={-35} textAnchor="end" interval={0} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={v => (v/1000).toFixed(0)+'k'} />
-              <Tooltip formatter={(v, n) => [fmt(v), n === 'words' ? 'Words' : n]} />
-              <Bar dataKey="words" radius={[4,4,0,0]}>
-                {branchSummary.map((_, i) => (
+              <YAxis tick={{ fontSize: 10 }} tickFormatter={v => v >= 1000 ? '₹' + (v/1000).toFixed(0) + 'k' : '₹' + v} />
+              <Tooltip formatter={(v) => ['₹' + Number(v).toLocaleString('en-IN'), 'Amount Paid']} />
+              <Bar dataKey="amount" radius={[4,4,0,0]}>
+                {[...branchSummary].sort((a, b) => b.amount - a.amount).map((_, i) => (
                   <Cell key={i} fill={BRANCH_COLORS[i % BRANCH_COLORS.length]} />
                 ))}
               </Bar>

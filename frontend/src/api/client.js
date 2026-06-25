@@ -225,6 +225,12 @@ export const api = {
   },
 
   // ── Task Groups ──────────────────────────────────────────────────────────────
+  // ── Task Bank ────────────────────────────────────────────────────────────────
+  listTaskBank:     (params={}) => { const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([,v])=>v))).toString(); return request(`/task-bank${qs?'?'+qs:''}`); },
+  createTaskBankItem: (data)     => request('/task-bank',      { method: 'POST',   body: JSON.stringify(data) }),
+  updateTaskBankItem: (id, data) => request(`/task-bank/${id}`, { method: 'PATCH',  body: JSON.stringify(data) }),
+  deleteTaskBankItem: (id)       => request(`/task-bank/${id}`, { method: 'DELETE' }),
+
   listTaskGroups:   ()         => request('/task-groups').then(r => r.groups || r),
   createTaskGroup:  (data)     => request('/task-groups',      { method: 'POST',   body: JSON.stringify(data) }),
   getTaskGroup:     (id)       => request(`/task-groups/${id}`),

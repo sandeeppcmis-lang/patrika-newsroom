@@ -1,11 +1,14 @@
 /**
  * POST /api/ai/assistant
- * Text-to-SQL newsroom assistant backed by GPT-4o-mini.
+ * Text-to-SQL newsroom assistant backed by Groq llama-3.1-8b-instant.
  * Generates a SELECT query, executes it safely, then narrates the result.
  */
 const { getUser }    = require('../_lib/auth');
 const { setCors, handleOptions } = require('../_lib/cors');
 const { query }      = require('../_lib/mysql');
+
+const GROQ_URL   = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.1-8b-instant';
 
 const toIST = ms => new Date(ms + 5.5 * 3600000).toISOString().slice(0, 10);
 
@@ -43,6 +46,21 @@ const DEFAULT_CHIPS = [
   'Most active branch this month',
 ];
 
+async function groqChat(messages, maxTokens = 300, temperature = 0) {
+  const fetch = require('node-fetch');
+  const r = await fetch(GROQ_URL, {
+    method:  'POST',
+    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: GROQ_MODEL, messages, max_tokens: maxTokens, temperature }),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Groq HTTP ${r.status}`);
+  }
+  const d = await r.json();
+  return d.choices?.[0]?.message?.content?.trim() || '';
+}
+
 module.exports = async function handler(req, res) {
   setCors(res);
   if (handleOptions(req, res)) return;
@@ -54,42 +72,31 @@ module.exports = async function handler(req, res) {
   const { q } = req.body || {};
   if (!q || !q.trim()) return res.status(400).json({ error: 'Missing query' });
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.GROQ_API_KEY) {
     return res.json({
-      answer:      'AI assistant is not configured. Please add OPENAI_API_KEY to .env to enable this feature.',
+      answer:      'AI assistant is not configured. Please add GROQ_API_KEY to .env to enable this feature.',
       suggestions: DEFAULT_CHIPS,
     });
   }
 
   try {
-    const fetch = require('node-fetch');
-
-    // ── Step 1: Generate SQL ──────────────────────────────────────────────────
-    const sqlRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method:  'POST',
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model:       'gpt-4o-mini',
-        temperature: 0,
-        max_tokens:  300,
-        messages: [
-          {
-            role:    'system',
-            content: `You are a MySQL query generator. Schema:\n${SCHEMA()}\nReturn ONLY valid SQL — no markdown, no explanation. Must start with SELECT. Must include LIMIT 20.`,
-          },
-          { role: 'user', content: q },
-        ],
-      }),
-    });
-
+    // ── Step 1: Generate SQL ────────────────────────────────────────────────────
     let sql = '';
-    if (sqlRes.ok) {
-      const d = await sqlRes.json();
-      sql = (d.choices?.[0]?.message?.content || '').trim()
-        .replace(/^```sql\n?/i, '').replace(/^```\n?/, '').replace(/\n?```$/, '').trim();
+    try {
+      sql = await groqChat([
+        {
+          role:    'system',
+          content: `You are a MySQL query generator. Schema:\n${SCHEMA()}\nReturn ONLY valid SQL — no markdown, no explanation, no backticks. Must start with SELECT. Must include LIMIT 20.`,
+        },
+        { role: 'user', content: q },
+      ], 300, 0);
+      // Strip any accidental markdown fences
+      sql = sql.replace(/^```sql\n?/i, '').replace(/^```\n?/, '').replace(/\n?```$/, '').trim();
+    } catch (e) {
+      console.error('[ai/assistant] SQL gen:', e.message);
     }
 
-    // ── Step 2: Execute safely ────────────────────────────────────────────────
+    // ── Step 2: Execute safely ──────────────────────────────────────────────────
     let rows     = [];
     let sqlError = null;
     if (sql && isSafeSQL(sql)) {
@@ -101,48 +108,28 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── Step 3: Narrate ───────────────────────────────────────────────────────
+    // ── Step 3: Narrate result ──────────────────────────────────────────────────
     const dataCtx = sqlError
       ? `SQL execution error: ${sqlError}`
       : rows.length
         ? `Query returned ${rows.length} rows: ${JSON.stringify(rows.slice(0, 15))}`
         : 'Query returned no rows — no matching data found.';
 
-    const ansRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method:  'POST',
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model:      'gpt-4o-mini',
-        max_tokens: 220,
-        messages: [
-          {
-            role:    'system',
-            content: 'You are a bilingual (Hindi-English) newsroom analyst for Patrika newspaper. Answer in 2–4 concise sentences mixing Hindi and English naturally. Cite specific numbers from the data. If no data, say so clearly.',
-          },
-          {
-            role:    'user',
-            content: `Question: ${q}\n\nData: ${dataCtx}`,
-          },
-        ],
-      }),
-    });
+    const answer = await groqChat([
+      {
+        role:    'system',
+        content: 'You are a bilingual (Hindi-English) newsroom analyst for Patrika newspaper. Answer in 2–4 concise sentences mixing Hindi and English naturally. Cite specific numbers from the data. If no data, say so clearly.',
+      },
+      {
+        role:    'user',
+        content: `Question: ${q}\n\nData: ${dataCtx}`,
+      },
+    ], 220, 0.5).catch(() => 'Kuch galat hua. Please dobara try karein.');
 
-    let answer = 'Kuch galat hua. Please dobara try karein.';
-    if (ansRes.ok) {
-      const d = await ansRes.json();
-      answer  = d.choices?.[0]?.message?.content?.trim() || answer;
-    }
-
-    return res.json({
-      answer,
-      suggestions: DEFAULT_CHIPS.slice(0, 4),
-    });
+    return res.json({ answer, suggestions: DEFAULT_CHIPS.slice(0, 4) });
 
   } catch (err) {
     console.error('[ai/assistant]', err.message);
-    return res.json({
-      answer:      `Error: ${err.message}`,
-      suggestions: DEFAULT_CHIPS,
-    });
+    return res.json({ answer: `Error: ${err.message}`, suggestions: DEFAULT_CHIPS });
   }
 };
