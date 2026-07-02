@@ -42,6 +42,10 @@ weeklyAppreciation.register();
 const dueDateAlerts = require('./api/cron/due-date-alerts');
 dueDateAlerts.register();
 
+// ── Cron: 3rd of every month 10 AM IST — correspondent zero-payment alert ─────
+const correspondentPaymentAlert = require('./api/cron/correspondent-payment-alert');
+correspondentPaymentAlert.register();
+
 // ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -148,7 +152,8 @@ app.use('/uploads/field', express.static(path.join(__dirname, 'uploads', 'field'
 app.post('/api/news-generator',       require('./api/news-generator'));
 
 // ── Correspondent ─────────────────────────────────────────────────────────────
-app.all('/api/correspondent',         h('./api/correspondent'));
+app.all('/api/correspondent/payment-alert', h('./api/cron/correspondent-payment-alert-api'));
+app.all('/api/correspondent',              h('./api/correspondent'));
 
 // ── Task Bank ─────────────────────────────────────────────────────────────────
 app.all('/api/task-bank/:id',         h('./api/task-bank/[id]'));

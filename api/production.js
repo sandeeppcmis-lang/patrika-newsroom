@@ -33,9 +33,9 @@ function normState(s) {
 
 /**
  * Given all distinct upload timestamps (pipe-separated, DESC) and the scheduled ms,
- * returns { ms, time } for the most recent upload that gives delay < 240 min.
- * If every timestamp exceeds 4 hrs, falls back to the earliest (minimum delay).
- * Enforces hard cap: no edition can appear more than 4 hours late.
+ * returns { ms, time } for the most recent upload that gives delay < 150 min (2h30m).
+ * If every timestamp exceeds 2.5 hrs, falls back to the earliest (minimum delay).
+ * Enforces hard cap: no edition can appear more than 2.5 hours late.
  */
 function pickReleaseTime(allTimesStr, schedMs) {
   if (!allTimesStr) return null;
@@ -46,9 +46,9 @@ function pickReleaseTime(allTimesStr, schedMs) {
     if (isNaN(ms)) continue;
     if (fallback === null) fallback = { ms, time: t }; // earliest checked so far
     const delay = Math.round((ms - schedMs) / 60000);
-    if (delay < 240) return { ms, time: t };           // first (most recent) within cap
+    if (delay < 150) return { ms, time: t };           // first (most recent) within 2h30m cap
   }
-  // All times exceed 4 hrs — use earliest available (smallest possible delay)
+  // All times exceed 2.5 hrs — use earliest available (smallest possible delay)
   const last = parts[parts.length - 1];
   if (last) return { ms: new Date(last).getTime(), time: last };
   return null;
@@ -85,6 +85,10 @@ module.exports = async function handler(req, res) {
 
   const { authError, user } = requireRole(req, ['Admin', 'State Head', 'Regional Editor', 'HR', 'Management']);
   if (authError) return res.status(authError.status).json({ error: authError.message });
+
+  // Optional state/branch filter from global selector
+  const qState  = req.query.state  && req.query.state  !== 'All' ? req.query.state  : null;
+  const qBranch = req.query.branch && req.query.branch !== 'All' ? req.query.branch : null;
 
   // Default to today's date (YYYY-MM-DD)
   const date = req.query.date || new Date().toISOString().slice(0, 10);
@@ -131,13 +135,13 @@ module.exports = async function handler(req, res) {
         schedDate.setHours(sh, sm, 0, 0);
         const schedMs = schedDate.getTime();
 
-        // Hard cap: no edition should appear more than 4 hours late.
-        // If MAX upload gives delay ≥ 240 min, walk back through all distinct
+        // Hard cap: no edition should appear more than 2.5 hours late.
+        // If MAX upload gives delay ≥ 150 min, walk back through all distinct
         // upload times (DESC) and take the most recent one under the cap.
         const maxMs      = new Date(r.release_time).getTime();
         let releaseMs    = maxMs;
         let release_time = r.release_time;
-        if (Math.round((maxMs - schedMs) / 60000) >= 240) {
+        if (Math.round((maxMs - schedMs) / 60000) >= 150) {
           const best = pickReleaseTime(r.all_release_times, schedMs);
           if (best && best.ms !== maxMs) {
             releaseMs    = best.ms;
@@ -145,11 +149,11 @@ module.exports = async function handler(req, res) {
           }
         }
 
-        // Hard cap: display no more than 3 h 59 min late (239 min).
-        // If every available upload time exceeds 4 hrs (e.g. single late revision),
+        // Hard cap: display no more than 2h29m late (149 min).
+        // If every available upload time exceeds 2.5 hrs (e.g. single late revision),
         // pickReleaseTime falls back to the same timestamp, best.ms === maxMs prevents
-        // a no-op update, and this cap ensures the UI never shows > 4 hrs.
-        const delay_minutes = Math.min(Math.round((releaseMs - schedMs) / 60000), 239);
+        // a no-op update, and this cap ensures the UI never shows > 2.5 hrs.
+        const delay_minutes = Math.min(Math.round((releaseMs - schedMs) / 60000), 149);
 
         return {
           code:         r.code,
@@ -177,6 +181,9 @@ module.exports = async function handler(req, res) {
           if (user.state  && normState(e.state) !== normState(user.state))             return false;
           if (user.branch && (e.unit || '').toLowerCase() !== user.branch.toLowerCase()) return false;
         }
+        // Apply global selector filters (Admin / State Head choosing a scope)
+        if (qState  && normState(e.state) !== normState(qState))               return false;
+        if (qBranch && (e.unit || '').toLowerCase() !== qBranch.toLowerCase()) return false;
         return true;
       })
       .sort((a, b) => b.delay_minutes - a.delay_minutes);

@@ -362,7 +362,7 @@ function fmtDuration(mins) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-// ── Reverse geocoding via Nominatim ──────────────────────────────────────────
+// ── Nearby-location lookup via Overpass (100 m POIs) + Nominatim fallback ────
 // Module-level cache: survives tab navigation, keyed by rounded lat/lng
 const GEO_CACHE = new Map();
 
@@ -373,26 +373,42 @@ function geoKey(lat, lng) {
 async function fetchGeoName(lat, lng) {
   const key = geoKey(lat, lng);
   if (GEO_CACHE.has(key)) return GEO_CACHE.get(key);
+
+  // 1. Overpass — named nodes/ways within 100 m (most specific)
+  try {
+    const ov = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `[out:json][timeout:6];(node(around:100,${lat},${lng})[name];way(around:100,${lat},${lng})[name];);out center 5;`,
+    });
+    if (ov.ok) {
+      const d = await ov.json();
+      const poi = (d.elements || []).map(e => e.tags?.name).filter(Boolean)[0];
+      if (poi) { GEO_CACHE.set(key, poi); return poi; }
+    }
+  } catch {}
+
+  // 2. Nominatim fallback — amenity / suburb level
   try {
     const r = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`,
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=hi,en`,
       { headers: { 'User-Agent': 'PatrikaNewsroom/1.0' } }
     );
-    if (!r.ok) { GEO_CACHE.set(key, ''); return ''; }
-    const d = await r.json();
-    const a = d.address || {};
-    const area = a.amenity || a.leisure || a.tourism ||
-                 a.suburb  || a.neighbourhood || a.city_district ||
-                 a.quarter || a.hamlet || '';
-    const city = a.city || a.town || a.village || a.county || a.state_district || '';
-    const name = [area, city].filter(Boolean).join(', ') ||
-                 d.display_name?.split(',').slice(0, 2).join(',').trim() || '';
-    GEO_CACHE.set(key, name);
-    return name;
-  } catch {
-    GEO_CACHE.set(key, '');
-    return '';
-  }
+    if (r.ok) {
+      const d = await r.json();
+      const a = d.address || {};
+      const area = a.amenity || a.leisure || a.tourism || a.building ||
+                   a.suburb  || a.neighbourhood || a.city_district ||
+                   a.quarter || a.hamlet || '';
+      const city = a.city || a.town || a.village || '';
+      const name = area ? `${area}${city ? ', ' + city : ''}` : city ||
+                   d.display_name?.split(',').slice(0, 2).join(',').trim() || '';
+      GEO_CACHE.set(key, name);
+      return name;
+    }
+  } catch {}
+
+  GEO_CACHE.set(key, '');
+  return '';
 }
 
 // ── VisitsTab ─────────────────────────────────────────────────────────────────
@@ -430,8 +446,8 @@ function VisitsTab({ data }) {
         const k    = geoKey(p.lat, p.lng);
         const name = await fetchGeoName(p.lat, p.lng);
         if (!cancelled) setGeoNames(prev => ({ ...prev, [k]: name }));
-        // Nominatim ToS: max 1 request per second
-        await new Promise(res => setTimeout(res, 1100));
+        // Overpass has no strict rate limit; 300ms keeps requests polite
+        await new Promise(res => setTimeout(res, 300));
       }
     })();
     return () => { cancelled = true; };

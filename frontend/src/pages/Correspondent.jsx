@@ -4,7 +4,7 @@ import { api } from '../api/client.js';
 import {
   Users, FileText, Image, IndianRupee, TrendingUp,
   Search, ChevronUp, ChevronDown, ChevronsUpDown,
-  Calendar, MapPin, Phone, Mail, Loader2,
+  Calendar, MapPin, Phone, Mail, Loader2, Send, ClipboardList,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -54,7 +54,7 @@ function fmtAmt(n) { return '₹' + Number(n || 0).toLocaleString('en-IN', { min
 const BRANCH_COLORS = ['#059669','#2563eb','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#65a30d'];
 
 export default function Correspondent() {
-  const { branch } = useApp();
+  const { branch, isAdmin } = useApp();
 
   const [data,         setData]         = useState(null);
   const [loading,      setLoading]      = useState(true);
@@ -62,6 +62,11 @@ export default function Correspondent() {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [search,       setSearch]       = useState('');
   const [expanded,     setExpanded]     = useState(null);
+  const [alertSending, setAlertSending] = useState(false);
+  const [alertMsg,     setAlertMsg]     = useState('');
+  const [alertLogs,    setAlertLogs]    = useState(null);
+  const [logsLoading,  setLogsLoading]  = useState(false);
+  const [showLogs,     setShowLogs]     = useState(false);
 
   // Load data when branch or month changes
   useEffect(() => {
@@ -75,6 +80,47 @@ export default function Correspondent() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [branch, selectedMonth]);
+
+  const alertFetch = (opts = {}) =>
+    fetch('/api/correspondent/payment-alert', {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('pk_token')}` },
+    });
+
+  const sendPaymentAlert = async () => {
+    if (!confirm('Send zero-payment Telegram alert to all REs now?')) return;
+    setAlertSending(true);
+    setAlertMsg('');
+    try {
+      const res = await alertFetch({ method: 'POST' });
+      const d = await res.json();
+      setAlertMsg(d.ok ? '✓ Alert sent successfully.' : `Error: ${d.error}`);
+      // Refresh logs if visible
+      if (showLogs) fetchAlertLogs();
+    } catch (e) {
+      setAlertMsg('Error: ' + e.message);
+    } finally {
+      setAlertSending(false);
+    }
+  };
+
+  const fetchAlertLogs = async () => {
+    setLogsLoading(true);
+    try {
+      const res = await alertFetch({ method: 'GET' });
+      const d = await res.json();
+      setAlertLogs(d.logs || []);
+    } catch (e) {
+      setAlertLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const toggleLogs = () => {
+    if (!showLogs && !alertLogs) fetchAlertLogs();
+    setShowLogs(v => !v);
+  };
 
   const rows = useMemo(() => {
     if (!data?.correspondents) return [];
@@ -116,8 +162,8 @@ export default function Correspondent() {
           </p>
         </div>
 
-        {/* Month selector */}
-        <div className="flex items-center gap-2">
+        {/* Month selector + alert button */}
+        <div className="flex items-center gap-2 flex-wrap">
           <Calendar size={15} style={{ color: 'var(--muted)' }} />
           <select
             value={selectedMonth}
@@ -128,6 +174,34 @@ export default function Correspondent() {
               <option key={m.value} value={m.value}>{m.label}</option>
             ))}
           </select>
+
+          {isAdmin() && (
+            <>
+              <button
+                onClick={sendPaymentAlert}
+                disabled={alertSending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition hover:opacity-80 disabled:opacity-50"
+                style={{ background: '#d7192015', color: '#d71920', border: '1px solid #d7192030' }}
+                title="Send zero-payment alert to REs via Telegram"
+              >
+                {alertSending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                Send Payment Alert
+              </button>
+              <button
+                onClick={toggleLogs}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition hover:opacity-80"
+                style={{ background: '#3b82f615', color: '#3b82f6', border: '1px solid #3b82f630' }}
+              >
+                <ClipboardList size={13} />
+                {showLogs ? 'Hide Report' : 'View Report'}
+              </button>
+            </>
+          )}
+          {alertMsg && (
+            <span className="text-xs font-medium" style={{ color: alertMsg.startsWith('✓') ? '#10b981' : '#d71920' }}>
+              {alertMsg}
+            </span>
+          )}
         </div>
       </div>
 
@@ -276,6 +350,73 @@ export default function Correspondent() {
           </table>
         </div>
       </div>
+
+      {/* ── Telegram Alert Report (Admin only) ── */}
+      {isAdmin() && showLogs && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-sm flex items-center gap-2">
+              <ClipboardList size={15} style={{ color: '#3b82f6' }} />
+              Telegram Alert Report
+            </h2>
+            <div className="flex items-center gap-2">
+              {logsLoading && <Loader2 size={14} className="animate-spin" style={{ color: 'var(--muted)' }} />}
+              <button onClick={fetchAlertLogs} disabled={logsLoading}
+                className="text-xs px-2 py-1 rounded hover:opacity-70"
+                style={{ color: 'var(--muted)', border: '1px solid var(--border)' }}>
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {alertLogs && alertLogs.length === 0 && (
+            <p className="text-sm text-center py-6" style={{ color: 'var(--muted)' }}>No alerts sent yet.</p>
+          )}
+
+          {alertLogs && alertLogs.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs" style={{ color: 'var(--muted)' }}>
+                    <th className="p-2 font-medium">#</th>
+                    <th className="p-2 font-medium">RE Name</th>
+                    <th className="p-2 font-medium">Branch</th>
+                    <th className="p-2 font-medium">Month</th>
+                    <th className="p-2 font-medium">Status</th>
+                    <th className="p-2 font-medium">Triggered By</th>
+                    <th className="p-2 font-medium">Sent At</th>
+                    <th className="p-2 font-medium">Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alertLogs.map((log, i) => (
+                    <tr key={log.id} className="border-t text-xs" style={{ borderColor: 'var(--border)' }}>
+                      <td className="p-2" style={{ color: 'var(--muted)' }}>{i + 1}</td>
+                      <td className="p-2 font-medium">{log.re_name || '—'}</td>
+                      <td className="p-2">{log.branch || '—'}</td>
+                      <td className="p-2">{log.month || '—'}</td>
+                      <td className="p-2">
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                          style={{
+                            background: log.status === 'sent' ? '#10b98120' : '#d7192020',
+                            color:      log.status === 'sent' ? '#10b981'   : '#d71920',
+                          }}>
+                          {log.status === 'sent' ? '✓ Sent' : '✗ Failed'}
+                        </span>
+                      </td>
+                      <td className="p-2 capitalize">{log.triggered_by || 'cron'}</td>
+                      <td className="p-2 whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                        {log.sent_at ? new Date(log.sent_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false }) : '—'}
+                      </td>
+                      <td className="p-2" style={{ color: '#d71920' }}>{log.error_msg || ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

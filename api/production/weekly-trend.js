@@ -15,6 +15,10 @@ const { query }                  = require('../_lib/mysql');
 const HIDDEN_EDITIONS = ['nt jaipur city', 'nt jaipur dak'];
 const isHidden = name => HIDDEN_EDITIONS.includes((name || '').toLowerCase().trim());
 
+// Normalise state name for comparison (mirrors api/production.js)
+const normState = s => (s || '').trim().toLowerCase()
+  .replace('rajasthan', 'raj').replace('madhya pradesh', 'mp').replace('chhattisgarh', 'cg');
+
 // ── Same release-time query used in production.js & delay-report.js ───────────
 // GMG file names start with the publish date as ddmmyyyy. One LIKE-prefix per day in
 // [startISO, endISO] lets the index on input_file range-seek instead of scanning.
@@ -49,7 +53,7 @@ function pickReleaseTime(allTimesStr, schedMs) {
   for (const t of parts) {
     const ms = new Date(t).getTime();
     if (isNaN(ms)) continue;
-    if (Math.round((ms - schedMs) / 60000) < 240) return { ms, time: t };
+    if (Math.round((ms - schedMs) / 60000) < 150) return { ms, time: t };
   }
   const last = parts[parts.length - 1];
   return last ? { ms: new Date(last).getTime(), time: last } : null;
@@ -68,8 +72,12 @@ module.exports = async function handler(req, res) {
   if (handleOptions(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { authError } = requireRole(req, ['Admin', 'State Head', 'Viewer']);
+  const { authError, user } = requireRole(req, ['Admin', 'State Head', 'Regional Editor', 'HR', 'Management', 'Viewer']);
   if (authError) return res.status(authError.status).json({ error: authError.message });
+
+  // Optional state/branch filter from global selector
+  const qState  = req.query.state  && req.query.state  !== 'All' ? req.query.state  : null;
+  const qBranch = req.query.branch && req.query.branch !== 'All' ? req.query.branch : null;
 
   // ── Parse params ──────────────────────────────────────────────────────────
   const endDate = req.query.endDate || new Date().toISOString().slice(0, 10);
@@ -123,20 +131,20 @@ module.exports = async function handler(req, res) {
       schedDate.setHours(sh, sm, 0, 0);
       const schedMs = schedDate.getTime();
 
-      // Hard cap: no edition more than 4 hours late.
+      // Hard cap: no edition more than 2.5 hours late.
       const maxMs   = new Date(r.release_time).getTime();
       let releaseMs = maxMs;
       let release_time = r.release_time;
-      if (Math.round((maxMs - schedMs) / 60000) >= 240) {
+      if (Math.round((maxMs - schedMs) / 60000) >= 150) {
         const best = pickReleaseTime(r.all_release_times, schedMs);
         if (best && best.ms !== maxMs) { releaseMs = best.ms; release_time = best.time; }
       }
 
-      // Hard cap: display no more than 3 h 59 min late (239 min).
-      // If only one upload timestamp exists and it's > 4 hrs late (e.g. a lone revision),
+      // Hard cap: display no more than 2h29m late (149 min).
+      // If only one upload timestamp exists and it's > 2.5 hrs late (e.g. a lone revision),
       // pickReleaseTime falls back to that same timestamp (best.ms === maxMs), no update
-      // occurs, and this cap ensures the heatmap never shows > 4 hrs.
-      const delay_minutes = Math.min(Math.round((releaseMs - schedMs) / 60000), 239);
+      // occurs, and this cap ensures the heatmap never shows > 2.5 hrs.
+      const delay_minutes = Math.min(Math.round((releaseMs - schedMs) / 60000), 149);
       const status = delay_minutes <= 0 ? 'ontime' : delay_minutes <= 30 ? 'warn' : 'late';
 
       if (isHidden(sched.edition_name)) return;
@@ -178,6 +186,19 @@ module.exports = async function handler(req, res) {
         max_delay:    maxDelay,
         data_days:    dayVals.length,
       };
+    }).filter(ed => {
+      // Role-based scope
+      if (user.role === 'State Head' && user.state) {
+        if (normState(ed.state) !== normState(user.state)) return false;
+      }
+      if (user.role === 'Regional Editor') {
+        if (user.state  && normState(ed.state) !== normState(user.state))             return false;
+        if (user.branch && (ed.unit || '').toLowerCase() !== user.branch.toLowerCase()) return false;
+      }
+      // Global selector filters
+      if (qState  && normState(ed.state) !== normState(qState))               return false;
+      if (qBranch && (ed.unit || '').toLowerCase() !== qBranch.toLowerCase()) return false;
+      return true;
     }).sort((a, b) => b.avg_delay - a.avg_delay); // worst-first default
 
     return res.json({ dates, startDate, endDate, days, editions });

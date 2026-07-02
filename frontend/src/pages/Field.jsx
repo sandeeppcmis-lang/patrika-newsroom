@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, Loader2, AlertTriangle,
   CheckCircle2, AlertCircle, ExternalLink, Camera,
   Sparkles, Copy, Check, RotateCcw, Newspaper, Upload, FileText, Image, File,
+  Search, X,
 } from 'lucide-react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -91,19 +92,52 @@ function captureGPS() {
 
 async function reverseGeocode(lat, lon) {
   try {
+    const [nomResult, ovResult] = await Promise.allSettled([
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=hi,en`).then(r => r.json()),
+      fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        body: `[out:json][timeout:6];(node(around:100,${lat},${lon})[name];way(around:100,${lat},${lon})[name];);out center 10;`,
+      }).then(r => r.json()),
+    ]);
+
+    let address = '', nearby = [], pois = [];
+
+    if (nomResult.status === 'fulfilled') {
+      const d = nomResult.value;
+      const a = d.address || {};
+      address = d.display_name || '';
+      nearby = [a.amenity, a.building, a.shop, a.road || a.pedestrian,
+                a.neighbourhood || a.suburb, a.city || a.town || a.village]
+        .filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 5);
+    }
+
+    if (ovResult.status === 'fulfilled') {
+      pois = (ovResult.value.elements || [])
+        .map(e => e.tags?.name).filter(Boolean)
+        .filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 8);
+    }
+
+    return { address, nearby, pois };
+  } catch { return { address: '', nearby: [], pois: [] }; }
+}
+
+async function searchPlaces(q) {
+  if (!q || !q.trim()) return [];
+  try {
     const r = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=hi,en`
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1&countrycodes=in&accept-language=hi,en`
     );
-    const d = await r.json();
-    const a = d.address || {};
-    const nearby = [
-      a.amenity, a.building, a.shop,
-      a.road || a.pedestrian,
-      a.neighbourhood || a.suburb,
-      a.city || a.town || a.village,
-    ].filter(Boolean);
-    return { address: d.display_name || '', nearby: [...new Set(nearby)].slice(0, 5) };
-  } catch { return { address: '', nearby: [] }; }
+    const data = await r.json();
+    return data.map(p => ({
+      displayName: p.display_name,
+      lat: +p.lat,
+      lon: +p.lon,
+      short: [p.address?.road || p.address?.pedestrian,
+              p.address?.neighbourhood || p.address?.suburb,
+              p.address?.city || p.address?.town || p.address?.village]
+        .filter(Boolean).slice(0, 2).join(', ') || p.display_name.split(',').slice(0, 2).join(','),
+    }));
+  } catch { return []; }
 }
 
 async function checkHindiGrammar(text) {
@@ -154,6 +188,25 @@ function findClusters(visits) {
     (map[root] = map[root] || []).push(visits[i]);
   }
   return Object.values(map).filter(g => g.length >= 2);
+}
+
+// ── Embedded OSM map with zoom controls ──────────────────────────────────────
+function MapView({ lat, lon, height = 220 }) {
+  if (!lat || !lon) return null;
+  const d = 0.0025;
+  const bbox = `${(lon - d).toFixed(6)},${(lat - d).toFixed(6)},${(lon + d).toFixed(6)},${(lat + d).toFixed(6)}`;
+  return (
+    <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600" style={{ height }}>
+      <iframe
+        title="location-map"
+        src={`https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`}
+        width="100%"
+        height={height}
+        style={{ border: 'none', display: 'block' }}
+        loading="lazy"
+      />
+    </div>
+  );
 }
 
 // ── GPS status pill ───────────────────────────────────────────────────────────
@@ -727,6 +780,12 @@ function VisitTab({ user }) {
   const [visLoad,  setVisLoad]  = useState(false);
   const [showClust,setShowClust]= useState(false);
 
+  // Location search
+  const [locSearch,    setLocSearch]    = useState('');
+  const [locResults,   setLocResults]   = useState([]);
+  const [locSearching, setLocSearching] = useState(false);
+  const searchTimeout = useRef(null);
+
   useEffect(() => { autoGps(); loadVisits(); }, []);
 
   // Live elapsed timer while checked in
@@ -745,6 +804,27 @@ function VisitTab({ user }) {
     setGpsLoad(true); setGpsErr('');
     try { const p = await captureGPS(); const g = await reverseGeocode(p.lat, p.lon); setGps({ ...p, ...g }); }
     catch (e) { setGpsErr(e.message); }
+    finally { setGpsLoad(false); }
+  }
+
+  function handleLocSearch(q) {
+    setLocSearch(q);
+    clearTimeout(searchTimeout.current);
+    setLocResults([]);
+    if (!q.trim()) return;
+    searchTimeout.current = setTimeout(async () => {
+      setLocSearching(true);
+      try { setLocResults(await searchPlaces(q)); }
+      catch {}
+      finally { setLocSearching(false); }
+    }, 400);
+  }
+
+  async function selectLocation(loc) {
+    setLocResults([]); setLocSearch('');
+    setGpsLoad(true);
+    try { const geo = await reverseGeocode(loc.lat, loc.lon); setGps({ lat: loc.lat, lon: loc.lon, accuracy: 0, ...geo }); }
+    catch {}
     finally { setGpsLoad(false); }
   }
 
@@ -768,7 +848,7 @@ function VisitTab({ user }) {
         latitude:         gps.lat,
         longitude:        gps.lon,
         location_address: gps.address || '',
-        nearby_places:    (gps.nearby || []).join(', '),
+        nearby_places:    [...(gps.pois || []), ...(gps.nearby || [])].filter((v, i, a) => a.indexOf(v) === i).join(', '),
       });
       const av = {
         id:           r.id,
@@ -876,7 +956,48 @@ function VisitTab({ user }) {
               <RefreshCw size={11} /> रिफ्रेश
             </button>
           </div>
-          <div className="p-4">
+          <div className="p-4 space-y-3">
+
+            {/* Location name search */}
+            <div className="relative">
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50">
+                {locSearching
+                  ? <Loader2 size={14} className="animate-spin text-emerald-500 shrink-0" />
+                  : <Search size={14} className="text-gray-400 shrink-0" />}
+                <input
+                  type="text"
+                  value={locSearch}
+                  onChange={e => handleLocSearch(e.target.value)}
+                  placeholder="नाम से खोजें… जैसे: राजभवन, जयपुर"
+                  className="flex-1 text-sm bg-transparent text-gray-800 dark:text-gray-100 outline-none placeholder-gray-400"
+                />
+                {locSearch && (
+                  <button onClick={() => { setLocSearch(''); setLocResults([]); }}>
+                    <X size={14} className="text-gray-400 hover:text-gray-600" />
+                  </button>
+                )}
+              </div>
+              {locResults.length > 0 && (
+                <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 shadow-xl overflow-hidden">
+                  {locResults.map((r, i) => (
+                    <button
+                      key={i}
+                      onClick={() => selectLocation(r)}
+                      className="w-full text-left px-4 py-3 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-b border-gray-50 dark:border-gray-700/60 last:border-0 transition-colors"
+                    >
+                      <div className="flex items-start gap-2">
+                        <MapPin size={13} className="text-emerald-500 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{r.short || r.displayName.split(',')[0]}</p>
+                          <p className="text-xs text-gray-400 truncate">{r.displayName}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {gpsLoad && <p className="text-sm text-gray-500 flex items-center gap-2"><Loader2 size={15} className="animate-spin text-emerald-500" /> GPS सिग्नल खोज रहे हैं…</p>}
             {gpsErr && (
               <div className="flex items-center gap-2 text-sm text-red-500">
@@ -885,19 +1006,46 @@ function VisitTab({ user }) {
               </div>
             )}
             {gps && !gpsLoad && (
-              <div className="space-y-1.5">
-                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                  ✅ {gps.lat.toFixed(6)}°N, {gps.lon.toFixed(6)}°E
-                  <span className="font-normal text-gray-400 ml-1.5 text-xs">(±{gps.accuracy}मी)</span>
-                </p>
-                {gps.address && <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{gps.address}</p>}
-                {gps.nearby?.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {gps.nearby.map((p, i) => (
-                      <span key={i} className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">{p}</span>
-                    ))}
-                  </div>
-                )}
+              <div className="space-y-3">
+                {/* Map with zoom */}
+                <MapView lat={gps.lat} lon={gps.lon} />
+
+                {/* Prominent nearby location (100m radius) */}
+                {(() => {
+                  const primary = gps.pois?.[0] || gps.nearby?.[0];
+                  const rest = [
+                    ...(gps.pois?.slice(1) || []),
+                    ...(gps.nearby || []).filter(n => !gps.pois?.includes(n)),
+                  ].slice(0, 6);
+                  if (!primary) return null;
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2.5 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-xl px-3 py-2.5">
+                        <MapPin size={20} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <div>
+                          <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200">{primary}</p>
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400">100 मीटर के भीतर का प्रमुख स्थान</p>
+                        </div>
+                      </div>
+                      {rest.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {rest.map((p, i) => (
+                            <span key={i} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2.5 py-1 rounded-full">{p}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Coordinates + accuracy */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">✅ ±{gps.accuracy}मी</span>
+                  <span className="text-xs text-gray-400 font-mono">{gps.lat.toFixed(5)}, {gps.lon.toFixed(5)}</span>
+                </div>
+
+                {gps.address && <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">{gps.address}</p>}
+
                 <a href={`https://www.google.com/maps?q=${gps.lat},${gps.lon}`} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
                   <ExternalLink size={10} /> Google Maps में देखें

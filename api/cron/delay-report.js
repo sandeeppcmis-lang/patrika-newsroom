@@ -40,14 +40,14 @@ const RELEASES_SQL = (tbl, region) => `
 `;
 
 // Walk back through all distinct upload times (DESC); return the most recent
-// that gives delay < 240 min, or the earliest available as a last resort.
+// that gives delay < 150 min (2h30m), or the earliest available as a last resort.
 function pickReleaseTime(allTimesStr, schedMs) {
   if (!allTimesStr) return null;
   const parts = String(allTimesStr).split('|').map(s => s.trim()).filter(Boolean);
   for (const t of parts) {
     const ms = new Date(t).getTime();
     if (isNaN(ms)) continue;
-    if (Math.round((ms - schedMs) / 60000) < 240) return { ms, time: t };
+    if (Math.round((ms - schedMs) / 60000) < 150) return { ms, time: t };
   }
   const last = parts[parts.length - 1];
   return last ? { ms: new Date(last).getTime(), time: last } : null;
@@ -61,10 +61,16 @@ function fmtDelay(minutes) {
   return `${sign}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+// mysql2 timezone:'Z' stores IST datetimes as UTC-labeled Date objects,
+// so getUTCHours() returns the correct stored IST value.
+// For strings from GROUP_CONCAT/pickReleaseTime, use regex to extract HH:MM directly.
 function fmtTime(dt) {
   if (!dt) return '—';
-  const d = new Date(dt);
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  if (dt instanceof Date) {
+    return `${String(dt.getUTCHours()).padStart(2,'0')}:${String(dt.getUTCMinutes()).padStart(2,'0')}`;
+  }
+  const m = String(dt).match(/[T ](\d{2}):(\d{2})/);
+  return m ? `${m[1]}:${m[2]}` : '—';
 }
 
 function todayIST() {
@@ -108,17 +114,17 @@ async function fetchDelayedByBranch(date) {
     schedDate.setHours(sh, sm, 0, 0);
     const schedMs = schedDate.getTime();
 
-    // Hard cap: no edition more than 4 hours late.
+    // Hard cap: no edition more than 2.5 hours late.
     const maxMs   = new Date(r.release_time).getTime();
     let releaseMs = maxMs;
     let release_time = r.release_time;
-    if (Math.round((maxMs - schedMs) / 60000) >= 240) {
+    if (Math.round((maxMs - schedMs) / 60000) >= 150) {
       const best = pickReleaseTime(r.all_release_times, schedMs);
       if (best && best.ms !== maxMs) { releaseMs = best.ms; release_time = best.time; }
     }
 
-    // Hard cap: treat any edition as no more than 3 h 59 min late (239 min).
-    const delay_minutes = Math.min(Math.round((releaseMs - schedMs) / 60000), 239);
+    // Hard cap: treat any edition as no more than 2h29m late (149 min).
+    const delay_minutes = Math.min(Math.round((releaseMs - schedMs) / 60000), 149);
 
     if (delay_minutes <= DELAY_WARN_MINUTES) return; // on time — skip
 

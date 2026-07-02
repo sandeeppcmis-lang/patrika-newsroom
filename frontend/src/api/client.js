@@ -83,7 +83,12 @@ export const api = {
     return withFallback(`/editorial${qs ? '?' + qs : ''}`, { summary:{}, topNews:[], storyMix:[], targetVsActual:[], deskReview:[], planning:[], anniversaries:[], rndIdeas:[], coverageGaps:[], prominentDays:[] });
   },
   editorialFeeds: () => withFallback('/editorial/feeds', { feeds: [], fetchedAt: '' }),
-  production:   (date)    => withFallback(`/production?date=${date}`,         { date, summary: { total: 0, onTime: 0, delayed: 0, avgDelay: 0, maxDelay: 0 }, editions: [] }),
+  production: (date, state, branch) => {
+    const p = new URLSearchParams({ date });
+    if (state  && state  !== 'All') p.set('state',  state);
+    if (branch && branch !== 'All') p.set('branch', branch);
+    return withFallback(`/production?${p.toString()}`, { date, summary: { total: 0, onTime: 0, delayed: 0, avgDelay: 0, maxDelay: 0 }, editions: [] });
+  },
   pageJourney:  (date)    => withFallback(`/production/page-journey?date=${date}`, { date, editions: [] }),
   pages: (date, state, branch) => {
     const p = new URLSearchParams({ date });
@@ -145,7 +150,14 @@ export const api = {
   },
 
   // ── Recruitment ─────────────────────────────────────────────────────────────
-  hrCandidates:      (status)    => withFallback(`/hr/candidates${status && status !== 'all' ? `?status=${status}` : ''}`, []),
+  hrCandidates:      (status, state, branch) => {
+    const p = new URLSearchParams();
+    if (status && status !== 'all') p.set('status', status);
+    if (state  && state  !== 'All') p.set('state',  state);
+    if (branch && branch !== 'All') p.set('branch', branch);
+    const qs = p.toString();
+    return withFallback(`/hr/candidates${qs ? '?' + qs : ''}`, []);
+  },
   addCandidate:      (data)      => request('/hr/candidates', { method: 'POST', body: JSON.stringify(data) }),
   updateCandidate:   (id, patch) => request(`/hr/candidates/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteCandidate:   (id)        => request(`/hr/candidates/${id}`, { method: 'DELETE' }),

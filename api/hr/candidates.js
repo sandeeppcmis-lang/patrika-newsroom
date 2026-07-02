@@ -14,16 +14,20 @@ module.exports = async (req, res) => {
   const { authError, user } = requireRole(req, ['Admin', 'HR', 'Management']);
   if (authError) return res.status(authError.status).json({ error: authError.message });
 
+  // Auto-migrate: add state/branch columns if missing
+  await query(`ALTER TABLE hr_candidates ADD COLUMN state  VARCHAR(100) DEFAULT NULL`).catch(() => {});
+  await query(`ALTER TABLE hr_candidates ADD COLUMN branch VARCHAR(100) DEFAULT NULL`).catch(() => {});
+
   // ── GET ──────────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
-    const { status } = req.query;
-    let sql = 'SELECT * FROM hr_candidates';
-    const params = [];
-    if (status && status !== 'all') { sql += ' WHERE status = ?'; params.push(status); }
-    sql += ' ORDER BY created_at DESC';
-
+    const { status, state, branch } = req.query;
+    const conds = [], params = [];
+    if (status && status !== 'all') { conds.push('status = ?'); params.push(status); }
+    if (state  && state  !== 'All') { conds.push('state = ?');  params.push(state); }
+    if (branch && branch !== 'All') { conds.push('branch = ?'); params.push(branch); }
+    const where = conds.length ? ' WHERE ' + conds.join(' AND ') : '';
     try {
-      const rows = await query(sql, params);
+      const rows = await query(`SELECT * FROM hr_candidates${where} ORDER BY created_at DESC`, params);
       return res.json(rows);
     } catch (err) {
       return res.status(500).json({ error: err.message });
@@ -43,7 +47,7 @@ module.exports = async (req, res) => {
     const ALLOWED = new Set([
       'name', 'father_name', 'email', 'mobile', 'address',
       'qualification', 'experience', 'aadhar', 'pan', 'gender',
-      'applied_for', 'status', 'notes',
+      'applied_for', 'status', 'notes', 'state', 'branch',
     ]);
     const cleaned = {};
     for (const [k, v] of Object.entries(body)) {

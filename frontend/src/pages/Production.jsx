@@ -514,13 +514,12 @@ function TelegramConfigModal({ onClose }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Production() {
-  const { t, user } = useApp();
+  const { t, user, state: globalState, branch: globalBranch } = useApp();
   const isAdmin = user?.role === 'Admin';
   const [activeTab,  setActiveTab]  = useState('monitor'); // 'monitor' | 'journey'
   const [date,       setDate]       = useState(today());
   const [data,       setData]       = useState(null);
   const [loading,    setLoading]    = useState(true);
-  const [region,     setRegion]     = useState('ALL'); // ALL | RAJ | MPCG
   const [search,     setSearch]     = useState('');
   const [sending,    setSending]    = useState(false);
   const [sendResult, setSendResult] = useState(null);
@@ -530,7 +529,7 @@ export default function Production() {
 
   const load = (d) => {
     setLoading(true);
-    api.production(d)
+    api.production(d, globalState, globalBranch)
       .then(setData)
       .finally(() => setLoading(false));
   };
@@ -573,7 +572,7 @@ export default function Production() {
     setSending(false);
   };
 
-  useEffect(() => { load(date); loadReasons(date); }, [date]);
+  useEffect(() => { load(date); loadReasons(date); }, [date, globalState, globalBranch]);
 
   const shiftDate = (n) => {
     const d = new Date(date);
@@ -581,11 +580,10 @@ export default function Production() {
     setDate(d.toISOString().slice(0, 10));
   };
 
-  // Filter by region + search
+  // Filter by search (state/branch already filtered server-side)
   const editions = useMemo(() => {
     if (!data?.editions) return [];
     return data.editions.filter(e => {
-      if (region !== 'ALL' && e.region !== region) return false;
       if (search) {
         const q = search.toLowerCase();
         return (e.edition_name || '').toLowerCase().includes(q) ||
@@ -594,7 +592,7 @@ export default function Production() {
       }
       return true;
     });
-  }, [data, region, search]);
+  }, [data, search]);
 
   // For chart — top 30 by delay (most delayed first), sort ascending for display
   const chartData = useMemo(() =>
@@ -684,21 +682,6 @@ export default function Production() {
             className="input py-1.5 text-sm font-semibold"
           />
           <button onClick={() => shiftDate(1)} className="btn-ghost p-1.5" disabled={date >= today()}><ChevronRight size={16} /></button>
-        </div>
-
-        {/* Region tabs */}
-        <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
-          {[['ALL','All'], ['RAJ','Rajasthan'], ['MPCG','MP / CG']].map(([val, lbl]) => (
-            <button
-              key={val}
-              onClick={() => setRegion(val)}
-              className="px-3 py-1.5 text-sm font-medium transition"
-              style={{
-                background: region === val ? 'var(--brand)' : 'var(--surface)',
-                color:      region === val ? '#fff' : 'var(--text)',
-              }}
-            >{lbl}</button>
-          ))}
         </div>
 
         {/* Search */}
@@ -1069,7 +1052,7 @@ function PageJourneyTab({ date, setDate, shiftDate }) {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { load(date); }, [date]);
+  useEffect(() => { load(date); }, [date, globalState, globalBranch]);
 
   const allEditions = journeyData?.editions || [];
 
@@ -1343,8 +1326,8 @@ function HeatCell({ d }) {
 }
 
 function WeeklyTrendTab({ date, setDate, shiftDate }) {
+  const { state: globalState, branch: globalBranch } = useApp();
   const [days,       setDays]       = useState(7);
-  const [region,     setRegion]     = useState('ALL');
   const [search,     setSearch]     = useState('');
   const [sortBy,     setSortBy]     = useState('avg');  // avg | max | late | name
   const [trendData,  setTrendData]  = useState(null);
@@ -1373,24 +1356,26 @@ function WeeklyTrendTab({ date, setDate, shiftDate }) {
   const load = useCallback((endDate, numDays) => {
     setLoading(true); setError('');
     const token = localStorage.getItem('pk_token');
-    fetch(`/api/production/weekly-trend?endDate=${endDate}&days=${numDays}`, {
+    const p = new URLSearchParams({ endDate, days: numDays });
+    if (globalState  && globalState  !== 'All') p.set('state',  globalState);
+    if (globalBranch && globalBranch !== 'All') p.set('branch', globalBranch);
+    fetch(`/api/production/weekly-trend?${p.toString()}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then(r => r.ok ? r.json() : r.json().then(e => { throw new Error(e.error || `HTTP ${r.status}`); }))
       .then(data => { setTrendData(data); setSelectedEd(null); })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [globalState, globalBranch]);
 
-  useEffect(() => { load(date, days); }, [date, days]);
+  useEffect(() => { load(date, days); }, [date, days, globalState, globalBranch]);
 
   const allEditions = trendData?.editions || [];
   const dates       = trendData?.dates    || [];
 
-  // Filter + sort
+  // Filter + sort (state/branch already filtered server-side)
   const editions = useMemo(() => {
     let list = allEditions;
-    if (region !== 'ALL') list = list.filter(e => e.region === region);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(e =>
@@ -1406,7 +1391,7 @@ function WeeklyTrendTab({ date, setDate, shiftDate }) {
     if (sortBy === 'late') s.sort((a, b) => b.delayed_days - a.delayed_days);
     if (sortBy === 'name') s.sort((a, b) => (a.edition_name||'').localeCompare(b.edition_name||''));
     return s;
-  }, [allEditions, region, search, sortBy]);
+  }, [allEditions, search, sortBy]);
 
   // Overall summary
   const stats = useMemo(() => {
@@ -1462,17 +1447,6 @@ function WeeklyTrendTab({ date, setDate, shiftDate }) {
               className="px-3 py-1.5 text-xs font-semibold transition"
               style={{ background: days===n ? 'var(--brand)' : 'var(--surface)', color: days===n ? '#fff' : 'var(--muted)' }}>
               {n}D
-            </button>
-          ))}
-        </div>
-
-        {/* Region */}
-        <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
-          {[['ALL','All'],['RAJ','RAJ'],['MPCG','MPCG']].map(([v, l]) => (
-            <button key={v} onClick={() => setRegion(v)}
-              className="px-3 py-1.5 text-xs font-semibold transition"
-              style={{ background: region===v ? 'var(--brand)' : 'var(--surface)', color: region===v ? '#fff' : 'var(--muted)' }}>
-              {l}
             </button>
           ))}
         </div>

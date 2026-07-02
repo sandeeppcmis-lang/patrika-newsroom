@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+﻿import { useEffect, useMemo, useState, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -15,7 +15,7 @@ import { api } from '../api/client.js';
 import { HR_FIELDS } from '../data/mock.js';
 import { PageHeader, SectionCard, Badge } from '../components/UI.jsx';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function calcAge(dob) {
   if (!dob) return null;
   const parts = String(dob).split('-');
@@ -71,7 +71,6 @@ const COLORS = ['#C9A227', '#d71920', '#3b82f6', '#10b981', '#8b5cf6', '#f97316'
 const GRADE_COLOR = { A: '#10b981', B: '#3b82f6', C: '#C9A227', D: '#d71920' };
 const TABS = [
   { key: 'overview',     label: 'Overview',            icon: BarChart2  },
-  { key: 'appointment',  label: 'Appointment',         icon: FileText   },
   { key: 'recruitment',  label: 'Recruitment',         icon: Briefcase  },
   { key: 'training',     label: 'Training & Induction',icon: Star       },
   { key: 'grading',      label: 'PLI & Grading',       icon: ShieldCheck},
@@ -80,7 +79,7 @@ const TABS = [
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function Hr() {
   const { t, canEditHr, canViewHr, canEditGrading, canEditTraining, isBranchRestricted, state: globalState, branch: globalBranch } = useApp();
   const [tab,     setTab]     = useState('overview');
@@ -109,16 +108,16 @@ export default function Hr() {
     return matchState && matchBranch;
   }), [rets, globalState, globalBranch]);
 
-  // Charts — all use `filtered` so they respond to top-left state/branch selection
+  // Charts â€” all use `filtered` so they respond to top-left state/branch selection
   const ageBuckets = useMemo(() => {
-    const b = { '20–29': 0, '30–39': 0, '40–49': 0, '50–59': 0, '60+': 0 };
+    const b = { '20â€“29': 0, '30â€“39': 0, '40â€“49': 0, '50â€“59': 0, '60+': 0 };
     filtered.forEach(e => {
       const a = calcAge(e.DOB);
       if (!a) return;
-      if (a < 30) b['20–29']++;
-      else if (a < 40) b['30–39']++;
-      else if (a < 50) b['40–49']++;
-      else if (a < 60) b['50–59']++;
+      if (a < 30) b['20â€“29']++;
+      else if (a < 40) b['30â€“39']++;
+      else if (a < 50) b['40â€“49']++;
+      else if (a < 60) b['50â€“59']++;
       else b['60+']++;
     });
     return Object.entries(b).map(([range, count]) => ({ range, count }));
@@ -142,9 +141,9 @@ export default function Hr() {
 
   return (
     <div>
-      <PageHeader title={t('nav.hr')} subtitle="Employee management · recruitment · training · PLI & grading · admin" />
+      <PageHeader title={t('nav.hr')} subtitle="Employee management Â· recruitment Â· training Â· PLI & grading Â· admin" />
 
-      {/* ── Tab Navigation ──────────────────────────────────────────────────── */}
+      {/* â”€â”€ Tab Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex gap-1 mb-5 border-b overflow-x-auto" style={{ borderColor: 'var(--border)' }}>
         {TABS
           // Regional Editor: hide Recruitment & Admin (view-only on Overview/Training/Grading)
@@ -165,7 +164,7 @@ export default function Hr() {
         ))}
       </div>
 
-      {/* ── Tab Panels ──────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Tab Panels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {tab === 'overview' && (
         <OverviewTab
           emps={emps} filtered={filtered} rets={filteredRets} loading={loading}
@@ -175,7 +174,6 @@ export default function Hr() {
           onDownload={() => downloadExcel(filtered, canViewHr())}
         />
       )}
-      {tab === 'appointment'  && <AppointmentTab canEditHr={canEditHr} globalState={globalState} globalBranch={globalBranch} />}
       {tab === 'recruitment'  && <RecruitmentTab />}
       {tab === 'training'     && <TrainingTab emps={filtered} canEditHr={canEditTraining} />}
       {tab === 'grading'      && <GradingTab  emps={filtered} canEditHr={canEditGrading} canViewHr={canViewHr} />}
@@ -186,13 +184,13 @@ export default function Hr() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // OVERVIEW TAB
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function OverviewTab({ emps, filtered, rets, loading, ageBuckets, deptBuckets,
   canViewHr, canEditHr, onEdit, onDownload }) {
 
-  // ── Profile-wise counts from Story_Type field ─────────────────────────────
+  // â”€â”€ Profile-wise counts from Story_Type field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // RE: Story_Type is exactly "RE" (word boundary match, not "Reporter")
   // Reporter: contains word "reporter"
   // Desk: contains word "desk"
@@ -211,7 +209,7 @@ function OverviewTab({ emps, filtered, rets, loading, ageBuckets, deptBuckets,
 
   const [search, setSearch] = useState('');
 
-  // Only working employees — global state/branch already applied via `filtered` prop
+  // Only working employees â€” global state/branch already applied via `filtered` prop
   const tableRows = useMemo(() => {
     return filtered.filter(e => {
       const working = e.Status === 'Working' || e.is_emp_working == 1 || e.Status === 'Active';
@@ -248,7 +246,7 @@ function OverviewTab({ emps, filtered, rets, loading, ageBuckets, deptBuckets,
               <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }} />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {ageBuckets.map((b, i) => (
-                  <Cell key={i} fill={b.range === '60+' || b.range === '50–59' ? '#d71920' : '#C9A227'} />
+                  <Cell key={i} fill={b.range === '60+' || b.range === '50â€“59' ? '#d71920' : '#C9A227'} />
                 ))}
               </Bar>
             </BarChart>
@@ -279,7 +277,7 @@ function OverviewTab({ emps, filtered, rets, loading, ageBuckets, deptBuckets,
                 </div>
                 <div className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
                   <CalendarClock size={11} className="inline mr-1" />
-                  Retires: {r.retireOn} · {r.emp_deptt} · {r.Branch}
+                  Retires: {r.retireOn} Â· {r.emp_deptt} Â· {r.Branch}
                 </div>
               </div>
             ))}
@@ -288,18 +286,18 @@ function OverviewTab({ emps, filtered, rets, loading, ageBuckets, deptBuckets,
       )}
 
       <SectionCard
-        title={`Employees — Working (${tableRows.length})`}
+        title={`Employees â€” Working (${tableRows.length})`}
         action={
           <button onClick={onDownload} className="btn-ghost flex items-center gap-1.5 text-sm">
             <Download size={14} /> Excel
           </button>
         }
       >
-        {/* ── Search filter ─────────────────────────────────────────────── */}
+        {/* â”€â”€ Search filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="flex flex-wrap gap-2 mb-3">
           <input
             type="text"
-            placeholder="Search name, PAN, dept…"
+            placeholder="Search name, PAN, deptâ€¦"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="input py-1.5 text-sm flex-1 min-w-[160px]"
@@ -317,7 +315,7 @@ function OverviewTab({ emps, filtered, rets, loading, ageBuckets, deptBuckets,
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8 gap-2" style={{ color: 'var(--muted)' }}>
-              <Loader2 size={16} className="animate-spin" /> Loading employees…
+              <Loader2 size={16} className="animate-spin" /> Loading employeesâ€¦
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -340,15 +338,15 @@ function OverviewTab({ emps, filtered, rets, loading, ageBuckets, deptBuckets,
                   const age = calcAge(e.DOB);
                   return (
                     <tr key={e.EMP_CODE} className="border-t hover:bg-black/5 dark:hover:bg-white/5 transition" style={{ borderColor: 'var(--border)' }}>
-                      <td className="p-2 font-mono text-xs font-semibold">{e.pan_no || '—'}</td>
+                      <td className="p-2 font-mono text-xs font-semibold">{e.pan_no || 'â€”'}</td>
                       <td className="p-2 font-semibold whitespace-nowrap">{e.EMPNAME}</td>
-                      <td className="p-2">{e.Story_Type || '—'}</td>
+                      <td className="p-2">{e.Story_Type || 'â€”'}</td>
                       <td className="p-2">{e.emp_deptt}</td>
                       <td className="p-2">{e.Branch}</td>
                       <td className="p-2">{e.State}</td>
                       <td className="p-2">
                         <span style={{ color: age >= 58 ? '#d71920' : 'inherit', fontWeight: age >= 58 ? 700 : 400 }}>
-                          {age ?? '—'}
+                          {age ?? 'â€”'}
                         </span>
                       </td>
                     </tr>
@@ -364,450 +362,11 @@ function OverviewTab({ emps, filtered, rets, loading, ageBuckets, deptBuckets,
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// APPOINTMENT TAB  (reads existing `appointment` table)
-// ═══════════════════════════════════════════════════════════════════════════════
-const PIPELINE_STAGES = ['SE Pending','SE Approved','Sent to HO','HO Interviewed','With Directors','Director Approved','Joined'];
-const STAGE_COLOR = {
-  'SE Pending':        '#6b7280',
-  'SE Approved':       '#3b82f6',
-  'Sent to HO':        '#f97316',
-  'HO Interviewed':    '#8b5cf6',
-  'With Directors':    '#C9A227',
-  'Director Approved': '#10b981',
-  'Joined':            '#d71920',
-};
-const PROFILE_COLORS = ['#d71920','#3b82f6','#10b981','#C9A227','#8b5cf6','#f97316','#06b6d4','#ec4899'];
 
-function fmtSalary(v) {
-  if (!v || v === 0) return '—';
-  if (v >= 100000) return `₹${(v/100000).toFixed(1)}L`;
-  if (v >= 1000)   return `₹${(v/1000).toFixed(0)}K`;
-  return `₹${v}`;
-}
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-}
 
-function AppointmentTab({ canEditHr, globalState, globalBranch }) {
-  const [data,        setData]        = useState({ appointments: [], stats: {} });
-  const [loading,     setLoading]     = useState(true);
-  const [search,      setSearch]      = useState('');
-  const [stageFilter, setStageFilter] = useState('all');
-  const [profFilter,  setProfFilter]  = useState('all');
-  const [expanded,    setExpanded]    = useState(null);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    api.hrAppointments().then(d => setData(d || { appointments: [], stats: {} })).finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const visible = useMemo(() => {
-    return (data.appointments || []).filter(a => {
-      if (globalState  !== 'All' && a.State  !== globalState)  return false;
-      if (globalBranch !== 'All' && a.Branch !== globalBranch) return false;
-      if (stageFilter !== 'all' && a._stage !== stageFilter)   return false;
-      if (profFilter  !== 'all' && a.profile !== profFilter)   return false;
-      if (search) {
-        const q = search.toLowerCase();
-        return (a.name||'').toLowerCase().includes(q)
-          || (a.Branch||'').toLowerCase().includes(q)
-          || (a.profile||'').toLowerCase().includes(q)
-          || (a.present_company||'').toLowerCase().includes(q)
-          || (a.mobile||'').toLowerCase().includes(q);
-      }
-      return true;
-    });
-  }, [data.appointments, globalState, globalBranch, stageFilter, profFilter, search]);
-
-  const stats = data.stats || {};
-
-  // Chart data
-  const profileData = useMemo(() => Object.entries(stats.byProfile || {})
-    .map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value), [stats]);
-
-  const stateData = useMemo(() => Object.entries(stats.byState || {})
-    .map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 10), [stats]);
-
-  const monthlyData = useMemo(() => {
-    const months = {};
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
-      const key   = d.toISOString().slice(0, 7);
-      const label = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
-      months[key] = { month: label, count: stats.byMonth?.[key] || 0 };
-    }
-    return Object.values(months);
-  }, [stats]);
-
-  const growthData = useMemo(() =>
-    Object.entries(stats.growthBuckets || {}).map(([name, value]) => ({ name, value })), [stats]);
-
-  const downloadExcel = () => {
-    const rows = visible.map(a => ({
-      '#':                 a.id,
-      'Name':              a.name           || '',
-      'Profile':           a.profile        || '',
-      'Type':              a.appoinment_type || '',
-      'State':             a.State          || '',
-      'Branch':            a.Branch         || '',
-      'Location':          a.location       || '',
-      'Gender':            a.gender         || '',
-      'Mobile':            a.mobile         || '',
-      'Experience':        `${a.exp_year || 0}y ${a.exp_month || 0}m`,
-      'Present Company':   a.present_company || '',
-      'Present CTC (₹)':  a.present_ctc    || '',
-      'Expected CTC (₹)': a.expected_ctc   || '',
-      'Decided Salary (₹)':a.decided_salary || '',
-      'Growth %':          a.growth         || '',
-      'SE Status':         a.se_level_status || '',
-      'HO Interview':      a.ho_interview_status || '',
-      'Director Status':   a.director_status || '',
-      'Date of Joining':   a.date_of_joining ? fmtDate(a.date_of_joining) : '',
-      'Pipeline Stage':    a._stage         || '',
-      'Appointment Reason':a.appointment_reason || '',
-      'Submitted On':      a.inserted_on ? fmtDate(a.inserted_on) : '',
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 12) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Appointments');
-    XLSX.writeFile(wb, `appointments_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20 gap-2" style={{ color: 'var(--muted)' }}>
-        <Loader2 size={20} className="animate-spin" /> Loading appointment data…
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-
-      {/* ── KPI tiles ─────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Tile icon={Users}        label="Total Candidates"   value={stats.total || 0}                         color="#3b82f6" />
-        <Tile icon={UserCheck}    label="Joined"             value={stats.pipeline?.Joined || 0}              color="#10b981" />
-        <Tile icon={CheckCircle2} label="Director Approved"  value={stats.pipeline?.['Director Approved']||0} color="#C9A227" />
-        <Tile icon={Clock}        label="Pending at SE"      value={stats.pipeline?.['SE Pending'] || 0}      color="#d71920" />
-      </div>
-
-      {/* ── Pipeline funnel ───────────────────────────────────────────────────── */}
-      <SectionCard title="Hiring Pipeline — Approval Funnel">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-          {PIPELINE_STAGES.map(stage => {
-            const count = stats.pipeline?.[stage] || 0;
-            const pct   = stats.total ? Math.round((count / stats.total) * 100) : 0;
-            const col   = STAGE_COLOR[stage];
-            return (
-              <button key={stage}
-                onClick={() => setStageFilter(stageFilter === stage ? 'all' : stage)}
-                className="rounded-xl p-3 text-center transition-all hover:scale-105"
-                style={{
-                  background: stageFilter === stage ? col : col + '15',
-                  border: `2px solid ${stageFilter === stage ? col : col + '40'}`,
-                  cursor: 'pointer',
-                }}>
-                <div className="text-2xl font-black" style={{ color: stageFilter === stage ? '#fff' : col }}>{count}</div>
-                <div className="text-xs font-semibold mt-0.5 leading-tight" style={{ color: stageFilter === stage ? 'rgba(255,255,255,0.85)' : col }}>{stage}</div>
-                <div className="text-xs mt-1" style={{ color: stageFilter === stage ? 'rgba(255,255,255,0.6)' : 'var(--muted)' }}>{pct}%</div>
-              </button>
-            );
-          })}
-        </div>
-        {stageFilter !== 'all' && (
-          <button onClick={() => setStageFilter('all')} className="mt-2 text-xs btn-ghost">
-            <X size={11} className="inline mr-1" />Clear filter
-          </button>
-        )}
-      </SectionCard>
-
-      {/* ── Charts row ────────────────────────────────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-3">
-
-        {/* Monthly submissions */}
-        <SectionCard title="Monthly Submissions (Last 12 Months)" className="lg:col-span-2">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={monthlyData} margin={{ left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="month" stroke="var(--muted)" fontSize={11} />
-              <YAxis allowDecimals={false} stroke="var(--muted)" fontSize={11} />
-              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }} />
-              <Bar dataKey="count" name="Candidates" radius={[6, 6, 0, 0]}>
-                {monthlyData.map((_, i) => (
-                  <Cell key={i} fill={i === monthlyData.length - 1 ? '#d71920' : '#3b82f6'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </SectionCard>
-
-        {/* Profile breakdown */}
-        <SectionCard title="By Profile / Role">
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={profileData} dataKey="value" nameKey="name"
-                cx="50%" cy="50%" outerRadius={72} fontSize={10}
-                label={({ name, value }) => `${name}: ${value}`} labelLine={false}>
-                {profileData.map((_, i) => <Cell key={i} fill={PROFILE_COLORS[i % PROFILE_COLORS.length]} />)}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </SectionCard>
-      </div>
-
-      {/* ── State bar + Salary growth ─────────────────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <SectionCard title="State-wise Candidates">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={stateData} layout="vertical" margin={{ left: 0, right: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis type="number" allowDecimals={false} stroke="var(--muted)" fontSize={11} />
-              <YAxis type="category" dataKey="name" width={80} stroke="var(--muted)" fontSize={11} />
-              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }} />
-              <Bar dataKey="value" name="Count" radius={[0, 6, 6, 0]}>
-                {stateData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </SectionCard>
-
-        <SectionCard title="Salary Growth Distribution">
-          <div className="mb-3 flex items-center gap-6 text-sm">
-            <div>
-              <div className="text-xs" style={{ color: 'var(--muted)' }}>Freshers</div>
-              <div className="font-bold text-lg">{stats.freshers || 0}</div>
-            </div>
-            <div>
-              <div className="text-xs" style={{ color: 'var(--muted)' }}>Experienced</div>
-              <div className="font-bold text-lg">{stats.experienced || 0}</div>
-            </div>
-            <div>
-              <div className="text-xs" style={{ color: 'var(--muted)' }}>Avg Decided CTC</div>
-              <div className="font-bold text-lg">{fmtSalary(stats.avgDecidedSalary)}</div>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart data={growthData} margin={{ left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="name" stroke="var(--muted)" fontSize={10} />
-              <YAxis allowDecimals={false} stroke="var(--muted)" fontSize={11} />
-              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }} />
-              <Bar dataKey="value" name="Candidates" radius={[4, 4, 0, 0]}>
-                {growthData.map((e, i) => (
-                  <Cell key={i} fill={e.name === 'Negative (cut)' ? '#d71920' : '#10b981'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </SectionCard>
-      </div>
-
-      {/* ── Candidate table ───────────────────────────────────────────────────── */}
-      <SectionCard
-        title={`Candidates (${visible.length})`}
-        action={
-          <button onClick={downloadExcel} className="btn-ghost flex items-center gap-1.5 text-sm">
-            <Download size={14} /> Excel
-          </button>
-        }
-      >
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          <input
-            type="text" placeholder="Search name, branch, company, mobile…"
-            value={search} onChange={e => setSearch(e.target.value)}
-            className="input py-1.5 text-sm flex-1 min-w-[180px]"
-          />
-          <select value={profFilter} onChange={e => setProfFilter(e.target.value)} className="input py-1.5 text-sm">
-            <option value="all">All Profiles</option>
-            {Object.keys(stats.byProfile || {}).sort().map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} className="input py-1.5 text-sm">
-            <option value="all">All Stages</option>
-            {PIPELINE_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          {(search || stageFilter !== 'all' || profFilter !== 'all') && (
-            <button onClick={() => { setSearch(''); setStageFilter('all'); setProfFilter('all'); }} className="btn-ghost py-1.5 text-sm">
-              <X size={13} className="inline mr-1" />Clear
-            </button>
-          )}
-        </div>
-
-        {visible.length === 0 ? (
-          <div className="text-center py-10" style={{ color: 'var(--muted)' }}>
-            <Briefcase size={32} className="mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No candidates match the current filters.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {visible.map((a) => {
-              const isOpen  = expanded === a.id;
-              const stage   = a._stage || 'SE Pending';
-              const col     = STAGE_COLOR[stage] || '#888';
-              const expStr  = [a.exp_year > 0 && `${a.exp_year}y`, a.exp_month > 0 && `${a.exp_month}m`].filter(Boolean).join(' ') || '0';
-              const growth  = Number(a.growth);
-              return (
-                <div key={a.id} className="rounded-xl overflow-hidden"
-                  style={{ border: `1.5px solid ${isOpen ? col : 'var(--border)'}` }}>
-
-                  {/* Row header */}
-                  <button
-                    className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                    onClick={() => setExpanded(isOpen ? null : a.id)}
-                  >
-                    {/* Photo */}
-                    {a.candidate_photo ? (
-                      <img src={a.candidate_photo} alt={a.name}
-                        className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                        onError={e => { e.target.style.display = 'none'; }} />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-sm"
-                        style={{ background: col }}>
-                        {(a.name||'?')[0].toUpperCase()}
-                      </div>
-                    )}
-
-                    {/* Name + profile + location */}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm">{a.name}</div>
-                      <div className="text-xs flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5" style={{ color: 'var(--muted)' }}>
-                        <span>{a.profile || '—'}</span>
-                        <span>·</span>
-                        <span>{a.Branch}, {a.State}</span>
-                        <span>·</span>
-                        <span>{expStr} exp</span>
-                        {a.present_company && <><span>·</span><span>{a.present_company}</span></>}
-                      </div>
-                    </div>
-
-                    {/* Salary info */}
-                    <div className="hidden sm:flex flex-col items-end mr-3">
-                      <div className="text-xs font-bold">{fmtSalary(a.decided_salary || a.expected_ctc)}</div>
-                      <div className="text-xs" style={{ color: !isNaN(growth) && growth < 0 ? '#d71920' : '#10b981' }}>
-                        {!isNaN(growth) ? `${growth > 0 ? '+' : ''}${growth}% growth` : ''}
-                      </div>
-                    </div>
-
-                    {/* Stage badge */}
-                    <span className="flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-bold text-white hidden md:inline-block"
-                      style={{ background: col }}>{stage}</span>
-
-                    <ChevronDown size={16} className="flex-shrink-0 transition-transform" style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(180deg)' : '' }} />
-                  </button>
-
-                  {/* Expanded detail */}
-                  {isOpen && (
-                    <div className="px-4 pb-4 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4 text-sm mb-4">
-                        <Detail label="Mobile"          value={a.mobile} />
-                        <Detail label="Gender"          value={a.gender} />
-                        <Detail label="DOB"             value={fmtDate(a.dob)} />
-                        <Detail label="Type"            value={a.appoinment_type} />
-                        <Detail label="Is Fresher"      value={a.is_fresher == 1 ? 'Yes' : 'No'} />
-                        <Detail label="Location"        value={a.location} />
-                        <Detail label="Company Location"value={a.company_location} />
-                        <Detail label="Exp. Designation"value={a.exp_designation} />
-                        <Detail label="Salary Format"   value={a.salary_format} />
-                        <Detail label="Present CTC"     value={fmtSalary(a.present_ctc)} />
-                        <Detail label="Expected CTC"    value={fmtSalary(a.expected_ctc)} />
-                        <Detail label="Decided Salary"  value={fmtSalary(a.decided_salary)} />
-                        <Detail label="Final CTC"       value={fmtSalary(a.final_ctc_salary)} />
-                        <Detail label="Submitted By"    value={a.insert_level} />
-                        <Detail label="Submitted On"    value={fmtDate(a.inserted_on)} />
-                        <Detail label="Date of Joining" value={fmtDate(a.date_of_joining)} />
-                      </div>
-
-                      {/* Appointment reason */}
-                      {a.appointment_reason && (
-                        <div className="mb-3 rounded-lg p-3" style={{ background: 'var(--bg)' }}>
-                          <div className="text-xs font-semibold mb-1" style={{ color: 'var(--muted)' }}>APPOINTMENT REASON</div>
-                          <div className="text-sm leading-relaxed">{a.appointment_reason}</div>
-                        </div>
-                      )}
-
-                      {/* Approval timeline */}
-                      <div className="mb-3">
-                        <div className="text-xs font-semibold mb-2" style={{ color: 'var(--muted)' }}>APPROVAL PIPELINE</div>
-                        <div className="flex flex-wrap gap-2">
-                          <ApprovalStep label="SE Level" status={a.se_level_status} remark={a.se_remark} />
-                          <ApprovalStep label="HO Interview" status={a.ho_interview_status} date={a.proposal_sent_to_ho_date} remark={a.ho_remark} />
-                          <ApprovalStep label="Director" status={a.director_status} date={a.proposal_sent_to_directors_date} remark={a.director_remark} approvedDate={a.director_approval_date} />
-                        </div>
-                      </div>
-
-                      {/* Document links */}
-                      <div className="flex flex-wrap gap-2">
-                        {a.resume && (
-                          <a href={a.resume} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
-                            style={{ background: '#3b82f620', color: '#3b82f6' }}>
-                            <FileText size={12} /> Resume
-                          </a>
-                        )}
-                        {a.current_salary_slip && (
-                          <a href={a.current_salary_slip} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
-                            style={{ background: '#10b98120', color: '#10b981' }}>
-                            <FileText size={12} /> Salary Slip
-                          </a>
-                        )}
-                        {a.upload_director_approval && (
-                          <a href={a.upload_director_approval} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
-                            style={{ background: '#C9A22720', color: '#C9A227' }}>
-                            <FileText size={12} /> Director Approval
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </SectionCard>
-    </div>
-  );
-}
-
-function Detail({ label, value }) {
-  if (!value || value === '—' || value === '₹0' || value === '₹0.0L') return null;
-  return (
-    <div>
-      <div className="text-xs" style={{ color: 'var(--muted)' }}>{label}</div>
-      <div className="font-semibold text-sm">{value}</div>
-    </div>
-  );
-}
-
-function ApprovalStep({ label, status, date, remark, approvedDate }) {
-  const s = (status || '').toLowerCase();
-  const approved = s === 'approved' || s === 'done' || s === 'completed';
-  const rejected = s === 'rejected' || s === 'not_eligible';
-  const col = approved ? '#10b981' : rejected ? '#d71920' : '#C9A227';
-  const displayStatus = status || 'Pending';
-  return (
-    <div className="flex-1 min-w-[140px] rounded-lg p-2.5" style={{ background: col + '12', border: `1px solid ${col}30` }}>
-      <div className="text-xs font-bold mb-1" style={{ color: col }}>{label}</div>
-      <div className="text-xs font-semibold" style={{ color: col }}>{displayStatus}</div>
-      {date && <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Sent: {fmtDate(date)}</div>}
-      {approvedDate && <div className="text-xs" style={{ color: 'var(--muted)' }}>Approved: {fmtDate(approvedDate)}</div>}
-      {remark && <div className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--muted)' }}>{remark}</div>}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // RECRUITMENT TAB
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const CANDIDATE_FIELDS = [
   { key: 'name',          label: 'Full Name',        required: true },
   { key: 'father_name',   label: "Father's Name" },
@@ -821,6 +380,8 @@ const CANDIDATE_FIELDS = [
   { key: 'aadhar',        label: 'Aadhar No.' },
   { key: 'pan',           label: 'PAN No.' },
   { key: 'applied_for',   label: 'Applied For (Post)' },
+  { key: 'state',         label: 'State' },
+  { key: 'branch',        label: 'Branch' },
   { key: 'notes',         label: 'Notes / Remarks' },
 ];
 
@@ -833,11 +394,13 @@ const CV_FIELDS = [
   { key: 'qualification', label: 'Qualification',   w: 140 },
   { key: 'experience',    label: 'Experience',      w: 120 },
   { key: 'applied_for',   label: 'Applied For',     w: 140 },
+  { key: 'state',         label: 'State',           w: 100 },
+  { key: 'branch',        label: 'Branch',          w: 120 },
   { key: 'pan',           label: 'PAN',             w: 110 },
 ];
 
 function RecruitmentTab() {
-  const { canEditHr } = useApp();
+  const { canEditHr, globalState, globalBranch } = useApp();
   const [candidates,    setCandidates]    = useState([]);
   const [filter,        setFilter]        = useState('all');
   const [loading,       setLoading]       = useState(true);
@@ -853,12 +416,12 @@ function RecruitmentTab() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.hrCandidates(filter).then(d => setCandidates(d || [])).finally(() => setLoading(false));
-  }, [filter]);
+    api.hrCandidates(filter, globalState, globalBranch).then(d => setCandidates(d || [])).finally(() => setLoading(false));
+  }, [filter, globalState, globalBranch]);
 
   useEffect(() => { load(); }, [load]);
 
-  // ── CV file upload & parse ──────────────────────────────────────────────
+  // â”€â”€ CV file upload & parse â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleCVUpload = async (e) => {
     const files = e.target.files;
     if (!files || !files.length) return;
@@ -909,7 +472,7 @@ function RecruitmentTab() {
     load();
   };
 
-  // ── Existing candidates ────────────────────────────────────────────────
+  // â”€â”€ Existing candidates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleAdd = async (data) => {
     try {
       const created = await api.addCandidate(data);
@@ -962,10 +525,10 @@ function RecruitmentTab() {
         <Tile icon={UserX}        label="Not Eligible"     value={candidates.filter(c=>c.status==='not_eligible').length} color="#d71920" />
       </div>
 
-      {/* ── CV Upload Section ──────────────────────────────────────────────── */}
+      {/* â”€â”€ CV Upload Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {canEditHr() && (
         <SectionCard className="mb-4"
-          title={extracted.length ? `CV Review — ${extracted.length} file${extracted.length > 1 ? 's' : ''} parsed` : 'Upload CVs'}
+          title={extracted.length ? `CV Review â€” ${extracted.length} file${extracted.length > 1 ? 's' : ''} parsed` : 'Upload CVs'}
         >
           {/* Drop zone / upload trigger */}
           {!extracted.length && (
@@ -977,12 +540,12 @@ function RecruitmentTab() {
               <div className="text-center">
                 <p className="font-semibold text-sm">Click to upload CVs</p>
                 <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
-                  PDF, DOCX, DOC, TXT, RTF — single or multiple files
+                  PDF, DOCX, DOC, TXT, RTF â€” single or multiple files
                 </p>
               </div>
               {uploading && (
                 <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--brand)' }}>
-                  <Loader2 size={16} className="animate-spin" /> Parsing files…
+                  <Loader2 size={16} className="animate-spin" /> Parsing filesâ€¦
                 </div>
               )}
               <input
@@ -1040,7 +603,7 @@ function RecruitmentTab() {
                                 onChange={e => setExtField(idx, f.key, e.target.value)}
                                 disabled={row._saved}
                               >
-                                {f.options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
+                                {f.options.map(o => <option key={o} value={o}>{o || 'â€”'}</option>)}
                               </select>
                             ) : (
                               <input
@@ -1049,7 +612,7 @@ function RecruitmentTab() {
                                 value={row[f.key] || ''}
                                 onChange={e => setExtField(idx, f.key, e.target.value)}
                                 disabled={row._saved}
-                                placeholder="—"
+                                placeholder="â€”"
                               />
                             )}
                           </td>
@@ -1091,7 +654,7 @@ function RecruitmentTab() {
               {/* Bottom action bar */}
               <div className="flex items-center gap-3 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
                 <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                  {savedCount} saved · {unsavedCount} pending
+                  {savedCount} saved Â· {unsavedCount} pending
                 </span>
                 {unsavedCount > 0 && (
                   <button
@@ -1116,7 +679,7 @@ function RecruitmentTab() {
         </SectionCard>
       )}
 
-      {/* ── Candidates Table ───────────────────────────────────────────────── */}
+      {/* â”€â”€ Candidates Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <SectionCard
         title={`Candidates (${visible.length})`}
         action={
@@ -1140,7 +703,7 @@ function RecruitmentTab() {
       >
         {loading ? (
           <div className="flex items-center justify-center py-8 gap-2" style={{ color: 'var(--muted)' }}>
-            <Loader2 size={16} className="animate-spin" /> Loading…
+            <Loader2 size={16} className="animate-spin" /> Loadingâ€¦
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1156,6 +719,8 @@ function RecruitmentTab() {
                   <th className="p-2">Qualification</th>
                   <th className="p-2">Experience</th>
                   <th className="p-2">Applied For</th>
+                  <th className="p-2">State</th>
+                  <th className="p-2">Branch</th>
                   <th className="p-2">PAN</th>
                   <th className="p-2">Status</th>
                   {canEditHr() && <th className="p-2">Actions</th>}
@@ -1163,7 +728,7 @@ function RecruitmentTab() {
               </thead>
               <tbody>
                 {visible.length === 0 && (
-                  <tr><td colSpan={12} className="p-6 text-center" style={{ color: 'var(--muted)' }}>No candidates found.</td></tr>
+                  <tr><td colSpan={14} className="p-6 text-center" style={{ color: 'var(--muted)' }}>No candidates found.</td></tr>
                 )}
                 {visible.map((c, idx) => (
                   <tr key={c.id} className="border-t hover:bg-black/5 dark:hover:bg-white/5 transition" style={{ borderColor: 'var(--border)' }}>
@@ -1176,6 +741,8 @@ function RecruitmentTab() {
                     <td className="p-2">{c.qualification}</td>
                     <td className="p-2">{c.experience}</td>
                     <td className="p-2">{c.applied_for}</td>
+                    <td className="p-2">{c.state}</td>
+                    <td className="p-2">{c.branch}</td>
                     <td className="p-2 font-mono text-xs">{c.pan}</td>
                     <td className="p-2">
                       <Badge tone={BADGE[c.status] || 'med'}>{LABEL[c.status] || c.status}</Badge>
@@ -1186,13 +753,13 @@ function RecruitmentTab() {
                           {c.status !== 'eligible' && (
                             <button onClick={() => setStatus(c.id, 'eligible')} disabled={saving === c.id}
                               className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: '#10b98120', color: '#10b981' }}>
-                              {saving === c.id ? '…' : 'Eligible'}
+                              {saving === c.id ? 'â€¦' : 'Eligible'}
                             </button>
                           )}
                           {c.status !== 'not_eligible' && (
                             <button onClick={() => setStatus(c.id, 'not_eligible')} disabled={saving === c.id}
                               className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: '#d7192020', color: '#d71920' }}>
-                              {saving === c.id ? '…' : 'Reject'}
+                              {saving === c.id ? 'â€¦' : 'Reject'}
                             </button>
                           )}
                           <button onClick={() => deleteRow(c.id)} className="text-xs hover:opacity-70" style={{ color: 'var(--muted)' }}>
@@ -1240,7 +807,7 @@ function CandidateModal({ onClose, onSave }) {
               <label className="label mb-1">{f.label}{f.required && ' *'}</label>
               {f.type === 'select' ? (
                 <select className="input w-full" value={form[f.key] || ''} onChange={e => set(f.key, e.target.value)}>
-                  <option value="">Select…</option>
+                  <option value="">Selectâ€¦</option>
                   {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
               ) : (
@@ -1252,7 +819,7 @@ function CandidateModal({ onClose, onSave }) {
         <div className="mt-5 flex justify-end gap-2">
           <button className="btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn-primary flex items-center gap-1.5" onClick={handleSave} disabled={saving}>
-            {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><Save size={14} /> Save</>}
+            {saving ? <><Loader2 size={14} className="animate-spin" /> Savingâ€¦</> : <><Save size={14} /> Save</>}
           </button>
         </div>
       </div>
@@ -1260,9 +827,9 @@ function CandidateModal({ onClose, onSave }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TRAINING & INDUCTION TAB
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const TRAINING_TYPES = ['AI', 'Excel', 'Other'];
 
 function TrainingTab({ emps, canEditHr }) {
@@ -1276,7 +843,7 @@ function TrainingTab({ emps, canEditHr }) {
     api.hrTraining().then(d => setRecords(d || [])).finally(() => setLoading(false));
   }, []);
 
-  // Build lookup: emp_code|training_type → record
+  // Build lookup: emp_code|training_type â†’ record
   const lookup = useMemo(() => {
     const m = {};
     records.forEach(r => { m[`${r.emp_code}|${r.training_type}`] = r; });
@@ -1355,12 +922,12 @@ function TrainingTab({ emps, canEditHr }) {
         <Tile icon={Clock}        label="Trainings Pending"    value={summary.required}  color="#C9A227" />
       </div>
 
-      <SectionCard title={`Training Status — Active (${displayEmps.length})`}>
-        {/* ── One-line filters ─────────────────────────────────────────── */}
+      <SectionCard title={`Training Status â€” Active (${displayEmps.length})`}>
+        {/* â”€â”€ One-line filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="flex flex-wrap gap-2 mb-3">
           <select value={filterType} onChange={e => setFilterType(e.target.value)} className="input py-1.5 text-sm">
             <option value="all">All Types</option>
-            {TRAINING_TYPES.map(t => <option key={t} value={t}>{t} — Pending</option>)}
+            {TRAINING_TYPES.map(t => <option key={t} value={t}>{t} â€” Pending</option>)}
           </select>
           {filterType !== 'all' && (
             <button onClick={() => setFilterType('all')} className="btn-ghost py-1.5 text-sm">
@@ -1374,7 +941,7 @@ function TrainingTab({ emps, canEditHr }) {
 
         {loading ? (
           <div className="flex items-center justify-center py-8 gap-2" style={{ color: 'var(--muted)' }}>
-            <Loader2 size={16} className="animate-spin" /> Loading…
+            <Loader2 size={16} className="animate-spin" /> Loadingâ€¦
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1394,7 +961,7 @@ function TrainingTab({ emps, canEditHr }) {
                 )}
                 {displayEmps.map(e => (
                   <tr key={e.EMP_CODE} className="border-t hover:bg-black/5 dark:hover:bg-white/5 transition" style={{ borderColor: 'var(--border)' }}>
-                    <td className="p-2 font-mono text-xs font-semibold">{e.pan_no || '—'}</td>
+                    <td className="p-2 font-mono text-xs font-semibold">{e.pan_no || 'â€”'}</td>
                     <td className="p-2 font-semibold whitespace-nowrap">{e.EMPNAME}</td>
                     <td className="p-2">{e.State}</td>
                     <td className="p-2">{e.Branch}</td>
@@ -1455,7 +1022,7 @@ function MarkTrainingModal({ emp, type, saving, onClose, onSave }) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="card relative z-10 w-full max-w-md p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">{type} Training — {emp.EMPNAME}</h3>
+          <h3 className="text-lg font-bold">{type} Training â€” {emp.EMPNAME}</h3>
           <button onClick={onClose} className="rounded-lg p-1 hover:bg-black/10"><X size={20} /></button>
         </div>
         <div className="space-y-3">
@@ -1482,7 +1049,7 @@ function MarkTrainingModal({ emp, type, saving, onClose, onSave }) {
         <div className="mt-5 flex justify-end gap-2">
           <button className="btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn-primary flex items-center gap-1.5" onClick={() => onSave(emp.EMP_CODE, emp.EMPNAME, type, name, status, date)} disabled={saving}>
-            {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><Save size={14} /> Save</>}
+            {saving ? <><Loader2 size={14} className="animate-spin" /> Savingâ€¦</> : <><Save size={14} /> Save</>}
           </button>
         </div>
       </div>
@@ -1490,9 +1057,9 @@ function MarkTrainingModal({ emp, type, saving, onClose, onSave }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PLI & GRADING TAB
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const GRADE_CRITERIA = [
   { key: 'work_grade',       label: 'Work' },
   { key: 'behaviour_grade',  label: 'Behaviour' },
@@ -1502,7 +1069,7 @@ const GRADE_CRITERIA = [
 
 // Compute overall % from four 0-5 scores
 function calcOverallPct(grades) {
-  // Filter out null / undefined / '' BEFORE Number() — Number(null)=0 and Number('')=0 would corrupt the result
+  // Filter out null / undefined / '' BEFORE Number() â€” Number(null)=0 and Number('')=0 would corrupt the result
   const vals = GRADE_CRITERIA
     .map(c => grades[c.key])
     .filter(v => v !== null && v !== undefined && v !== '')
@@ -1510,7 +1077,7 @@ function calcOverallPct(grades) {
     .filter(v => !isNaN(v) && v >= 0 && v <= 5);
   if (!vals.length) return null;
   const sum = vals.reduce((a, v) => a + v, 0);
-  // Always out of 20 (4 criteria × 5 max) — unfilled = 0 contribution
+  // Always out of 20 (4 criteria Ã— 5 max) â€” unfilled = 0 contribution
   return Math.round((sum / 20) * 100);
 }
 
@@ -1555,9 +1122,9 @@ function GradingTab({ emps, canEditHr, canViewHr }) {
 
   const saveRow = async (emp) => {
     const pan = emp.pan_no || emp.PAN;
-    if (!pan) return alert('Employee has no PAN number — cannot save grading.');
+    if (!pan) return alert('Employee has no PAN number â€” cannot save grading.');
     const grades = localGrades[pan] || {};
-    // Validate: each score must be 0–5
+    // Validate: each score must be 0â€“5
     for (const c of GRADE_CRITERIA) {
       const v = grades[c.key];
       if (v !== '' && v !== undefined && v !== null) {
@@ -1612,7 +1179,7 @@ function GradingTab({ emps, canEditHr, canViewHr }) {
   return (
     <div>
       <SectionCard title={`PLI & Monthly Grading (${displayEmps.length})`}>
-        {/* ── One-line filters ─────────────────────────────────────────── */}
+        {/* â”€â”€ One-line filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="flex flex-wrap gap-2 mb-3">
           <input
             type="month" className="input py-1.5 text-sm" value={month}
@@ -1625,12 +1192,12 @@ function GradingTab({ emps, canEditHr, canViewHr }) {
         </div>
 
         <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>
-          Score each employee 0–5 per criterion (5 = Excellent, 0 = Poor). Overall % = total scored ÷ 20 × 100. PAN is the unique key.
+          Score each employee 0â€“5 per criterion (5 = Excellent, 0 = Poor). Overall % = total scored Ã· 20 Ã— 100. PAN is the unique key.
         </p>
 
         {loading ? (
           <div className="flex items-center justify-center py-8 gap-2" style={{ color: 'var(--muted)' }}>
-            <Loader2 size={16} className="animate-spin" /> Loading…
+            <Loader2 size={16} className="animate-spin" /> Loadingâ€¦
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1642,7 +1209,7 @@ function GradingTab({ emps, canEditHr, canViewHr }) {
                   <th className="p-2">Story Type</th>
                   <th className="p-2">State</th>
                   <th className="p-2">Branch</th>
-                  {GRADE_CRITERIA.map(c => <th key={c.key} className="p-2 text-center">{c.label}<span className="block text-[10px] font-normal opacity-60">0–5</span></th>)}
+                  {GRADE_CRITERIA.map(c => <th key={c.key} className="p-2 text-center">{c.label}<span className="block text-[10px] font-normal opacity-60">0â€“5</span></th>)}
                   <th className="p-2 text-center">Overall<span className="block text-[10px] font-normal opacity-60">%</span></th>
                   {canEditHr() && <th className="p-2" />}
                 </tr>
@@ -1667,11 +1234,11 @@ function GradingTab({ emps, canEditHr, canViewHr }) {
 
                   return (
                     <tr key={e.EMP_CODE} className="border-t hover:bg-black/5 dark:hover:bg-white/5 transition" style={{ borderColor: 'var(--border)' }}>
-                      <td className="p-2 font-mono text-xs font-semibold">{pan || '—'}</td>
+                      <td className="p-2 font-mono text-xs font-semibold">{pan || 'â€”'}</td>
                       <td className="p-2 font-semibold whitespace-nowrap">{e.EMPNAME}</td>
-                      <td className="p-2 text-xs">{e.Story_Type || '—'}</td>
-                      <td className="p-2">{e.State || '—'}</td>
-                      <td className="p-2">{e.Branch || '—'}</td>
+                      <td className="p-2 text-xs">{e.Story_Type || 'â€”'}</td>
+                      <td className="p-2">{e.State || 'â€”'}</td>
+                      <td className="p-2">{e.Branch || 'â€”'}</td>
                       {GRADE_CRITERIA.map(c => {
                         const curVal = lg[c.key] !== undefined ? lg[c.key] : (saved?.[c.key] ?? '');
                         return (
@@ -1689,11 +1256,11 @@ function GradingTab({ emps, canEditHr, canViewHr }) {
                                 }}
                                 style={{ color: scoreColor(curVal), fontWeight: 700 }}
                                 disabled={!pan}
-                                placeholder="—"
+                                placeholder="â€”"
                               />
                             ) : (
                               <span className="font-bold text-sm" style={{ color: scoreColor(curVal) }}>
-                                {curVal !== '' && curVal !== null && curVal !== undefined ? curVal : '—'}
+                                {curVal !== '' && curVal !== null && curVal !== undefined ? curVal : 'â€”'}
                               </span>
                             )}
                           </td>
@@ -1705,7 +1272,7 @@ function GradingTab({ emps, canEditHr, canViewHr }) {
                               style={{ background: overallPct >= 80 ? '#10b981' : overallPct >= 60 ? '#C9A227' : '#d71920' }}>
                               {overallPct}%
                             </span>
-                          : <span className="text-xs" style={{ color: 'var(--muted)' }}>—</span>
+                          : <span className="text-xs" style={{ color: 'var(--muted)' }}>â€”</span>
                         }
                       </td>
                       {canEditHr() && (
@@ -1737,7 +1304,7 @@ function GradingTab({ emps, canEditHr, canViewHr }) {
 }
 
 function GradeBadge({ grade }) {
-  if (!grade) return <span style={{ color: 'var(--muted)' }}>—</span>;
+  if (!grade) return <span style={{ color: 'var(--muted)' }}>â€”</span>;
   return (
     <span className="inline-block w-7 h-7 rounded-full text-sm font-bold leading-7 text-center text-white" style={{ background: GRADE_COLOR[grade] || '#888' }}>
       {grade}
@@ -1745,9 +1312,9 @@ function GradeBadge({ grade }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // ADMIN TAB
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function AdminTab({ emps, canEditHr }) {
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1780,7 +1347,7 @@ function AdminTab({ emps, canEditHr }) {
       'Available (Working)':   p.available,
       'Sanctioned':            p.sanctionedCount ?? 'Not Set',
       'Vacant':                p.vacant ?? 'N/A',
-      'Avg Salary':            p.avgSalary ? `₹${p.avgSalary.toLocaleString('en-IN')}` : '',
+      'Avg Salary':            p.avgSalary ? `â‚¹${p.avgSalary.toLocaleString('en-IN')}` : '',
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -1791,7 +1358,7 @@ function AdminTab({ emps, canEditHr }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 gap-2" style={{ color: 'var(--muted)' }}>
-        <Loader2 size={20} className="animate-spin" /> Loading admin stats…
+        <Loader2 size={20} className="animate-spin" /> Loading admin statsâ€¦
       </div>
     );
   }
@@ -1803,8 +1370,8 @@ function AdminTab({ emps, canEditHr }) {
       {/* Retirement Overview */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <RetTile label="Retiring This Year"  count={(ret.overdue?.length || 0) + (ret.within1yr?.length || 0)} color="#d71920" />
-        <RetTile label="Retiring in 1–3 yrs" count={ret.yr1to3?.length || 0}   color="#f97316" />
-        <RetTile label="Retiring in 3–5 yrs" count={ret.yr3to5?.length || 0}   color="#C9A227" />
+        <RetTile label="Retiring in 1â€“3 yrs" count={ret.yr1to3?.length || 0}   color="#f97316" />
+        <RetTile label="Retiring in 3â€“5 yrs" count={ret.yr3to5?.length || 0}   color="#C9A227" />
         <RetTile label="Left / Inactive"      count={stats?.totalInactive || inactive.length} color="#6b7280" />
       </div>
 
@@ -1816,7 +1383,7 @@ function AdminTab({ emps, canEditHr }) {
               <div key={e.EMP_CODE} className="rounded-lg p-3" style={{ background: 'var(--bg)' }}>
                 <div className="text-sm font-semibold">{e.EMPNAME}</div>
                 <div className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
-                  {e.Story_Type || e.emp_designation} · {e.Branch} · Age {e.age} · Retires {e.retireOn}
+                  {e.Story_Type || e.emp_designation} Â· {e.Branch} Â· Age {e.age} Â· Retires {e.retireOn}
                 </div>
               </div>
             ))}
@@ -1845,7 +1412,7 @@ function AdminTab({ emps, canEditHr }) {
 
       {/* Profile-wise Sanction vs Available */}
       <SectionCard
-        title="Story Type–wise: Sanctioned vs Available (Active Members)"
+        title="Story Typeâ€“wise: Sanctioned vs Available (Active Members)"
         action={
           <div className="flex items-center gap-2">
             <button onClick={downloadProfiles} className="btn-ghost flex items-center gap-1.5 text-sm">
@@ -1855,7 +1422,7 @@ function AdminTab({ emps, canEditHr }) {
         }
       >
         <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>
-          Click the sanctioned count to update it. Vacant = Sanctioned − Available.
+          Click the sanctioned count to update it. Vacant = Sanctioned âˆ’ Available.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1880,21 +1447,21 @@ function AdminTab({ emps, canEditHr }) {
                         className="font-medium hover:opacity-70"
                         style={{ color: p.sanctionedCount != null ? 'inherit' : 'var(--muted)' }}
                       >
-                        {p.sanctionedCount != null ? p.sanctionedCount : 'Set →'}
+                        {p.sanctionedCount != null ? p.sanctionedCount : 'Set â†’'}
                       </button>
                     ) : (
-                      p.sanctionedCount ?? '—'
+                      p.sanctionedCount ?? 'â€”'
                     )}
                   </td>
                   <td className="p-2 text-right">
                     {p.vacant != null ? (
                       <span style={{ color: p.vacant > 0 ? '#d71920' : '#10b981', fontWeight: 600 }}>
-                        {p.vacant > 0 ? p.vacant : '✓ Full'}
+                        {p.vacant > 0 ? p.vacant : 'âœ“ Full'}
                       </span>
-                    ) : '—'}
+                    ) : 'â€”'}
                   </td>
                   <td className="p-2 text-right">
-                    {p.avgSalary ? `₹${p.avgSalary.toLocaleString('en-IN')}` : '—'}
+                    {p.avgSalary ? `â‚¹${p.avgSalary.toLocaleString('en-IN')}` : 'â€”'}
                   </td>
                 </tr>
               ))}
@@ -1925,7 +1492,7 @@ function AdminTab({ emps, canEditHr }) {
                 <tr key={e.EMP_CODE} className="border-t hover:bg-black/5 dark:hover:bg-white/5 transition" style={{ borderColor: 'var(--border)' }}>
                   <td className="p-2 font-mono text-xs">{e.EMP_CODE}</td>
                   <td className="p-2 font-semibold">{e.EMPNAME}</td>
-                  <td className="p-2">{e.Story_Type || e.emp_designation || '—'}</td>
+                  <td className="p-2">{e.Story_Type || e.emp_designation || 'â€”'}</td>
                   <td className="p-2">{e.emp_deptt}</td>
                   <td className="p-2">{e.Branch}</td>
                   <td className="p-2">{e.DOJ}</td>
@@ -1955,7 +1522,7 @@ function AdminTab({ emps, canEditHr }) {
             <div className="mt-4 flex justify-end gap-2">
               <button className="btn-ghost" onClick={() => setSanctionEdit(null)} disabled={saving}>Cancel</button>
               <button className="btn-primary flex items-center gap-1.5" onClick={saveSanction} disabled={saving}>
-                {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><Save size={14} /> Save</>}
+                {saving ? <><Loader2 size={14} className="animate-spin" /> Savingâ€¦</> : <><Save size={14} /> Save</>}
               </button>
             </div>
           </div>
@@ -1974,9 +1541,9 @@ function RetTile({ label, count, color }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SHARED COMPONENTS
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function Tile({ icon: Icon, label, value, color }) {
   return (
     <div className="card p-4">
@@ -2025,7 +1592,7 @@ function EmployeeModal({ emp, onClose, onSave }) {
         <div className="mt-5 flex justify-end gap-2">
           <button className="btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn-primary flex items-center gap-1.5" onClick={handleSave} disabled={saving}>
-            {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><Save size={14} /> Save</>}
+            {saving ? <><Loader2 size={14} className="animate-spin" /> Savingâ€¦</> : <><Save size={14} /> Save</>}
           </button>
         </div>
       </div>
