@@ -930,9 +930,7 @@ function fmtT(dt) {
   if (!dt) return '—';
   const d = new Date(dt);
   if (isNaN(d)) return '—';
-  // GMG inserts IST timestamps; mysql2 timezone:'Z' labels them UTC, so
-  // getUTCHours() recovers the original IST value without a double +5:30 shift
-  return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 // Duration helper
